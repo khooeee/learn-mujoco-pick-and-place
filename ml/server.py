@@ -39,7 +39,8 @@ app.add_middleware(
 _proc: subprocess.Popen | None = None
 _run_id: str | None = None
 _log: list[str] = []
-_mint_busy = False
+_mint_lock = threading.Lock()
+_mint: dict = {"busy": False, "prompt": "", "error": None, "last": None}
 
 
 class TrainReq(BaseModel):
@@ -108,10 +109,42 @@ def _status_from_disk() -> dict:
     return row
 
 
+def _mint_snapshot() -> dict:
+    with _mint_lock:
+        return {
+            "busy": bool(_mint["busy"]),
+            "prompt": _mint["prompt"] or "",
+            "error": _mint["error"],
+            "last": _mint["last"],
+        }
+
+
+def _mint_job(prompt: str) -> None:
+    try:
+        meta = generate_from_prompt(prompt)
+        with _mint_lock:
+            _mint["busy"] = False
+            _mint["error"] = None
+            _mint["last"] = meta
+    except Exception as e:
+        with _mint_lock:
+            _mint["busy"] = False
+            _mint["error"] = str(e)
+            _mint["last"] = None
+
+
 @app.get("/health")
 def health():
     load_dotenv()
-    return {"ok": True, "mint": bool(api_key())}
+    job = _mint_snapshot()
+    return {
+        "ok": True,
+        "mint": bool(api_key()),
+        "mint_busy": job["busy"],
+        "mint_prompt": job["prompt"],
+        "mint_error": job["error"],
+        "mint_last": job["last"],
+    }
 
 
 @app.get("/status")
@@ -349,19 +382,20 @@ def objects_select(req: SelectReq):
 
 @app.post("/mint/generate")
 def mint_generate(req: MintReq):
-    global _mint_busy
-    if _mint_busy:
-        raise HTTPException(409, "Mint is already generating")
+    prompt = (req.prompt or "").strip()
+    if not prompt:
+        raise HTTPException(400, "Enter a prompt")
     if not api_key():
         raise HTTPException(400, "Set MINT_API_KEY in .env (https://platform.mint.gg)")
-    _mint_busy = True
-    try:
-        meta = generate_from_prompt(req.prompt)
-    except RuntimeError as e:
-        raise HTTPException(400, str(e)) from e
-    finally:
-        _mint_busy = False
-    return meta
+    with _mint_lock:
+        if _mint["busy"]:
+            raise HTTPException(409, "Mint is already generating")
+        _mint["busy"] = True
+        _mint["prompt"] = prompt
+        _mint["error"] = None
+        _mint["last"] = None
+    threading.Thread(target=_mint_job, args=(prompt,), daemon=True).start()
+    return {"ok": True, "busy": True, "prompt": prompt}
 
 
 if __name__ == "__main__":

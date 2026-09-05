@@ -32,6 +32,7 @@ export function Panel() {
   const episodesTarget = useTwin((s) => s.episodesTarget);
   const mintPrompt = useTwin((s) => s.mintPrompt);
   const mintBusy = useTwin((s) => s.mintBusy);
+  const mintJobPrompt = useTwin((s) => s.mintJobPrompt);
   const mintConfigured = useTwin((s) => s.mintConfigured);
   const objects = useTwin((s) => s.objects);
   const selectedId = useTwin((s) => s.selectedId);
@@ -39,6 +40,9 @@ export function Panel() {
   const runs = useTwin((s) => s.runs);
   const glbInput = useRef<HTMLInputElement>(null);
   const [importBusy, setImportBusy] = useState(false);
+
+  const mintWasBusy = useRef(false);
+  const mintPost = useRef(false);
 
   useEffect(() => {
     let stop = false;
@@ -50,6 +54,21 @@ export function Panel() {
         s.setRlOnline(Boolean(health));
         if (!health) return;
         s.setMintConfigured(Boolean(health.mint));
+        const busy = Boolean(health.mint_busy);
+        if (busy) {
+          s.setMintBusy(true);
+          s.setMintJobPrompt(health.mint_prompt ?? "");
+        } else if (!mintPost.current) {
+          s.setMintBusy(false);
+        }
+        if (busy && !mintWasBusy.current) {
+          s.log(`Mint generating… ${health.mint_prompt || ""}`.trim());
+        }
+        if (!busy && mintWasBusy.current && !mintPost.current) {
+          if (health.mint_error) s.log(health.mint_error);
+          else if (health.mint_last) s.log(`Saved ${health.mint_last.prompt} (${health.mint_last.id})`);
+        }
+        mintWasBusy.current = busy || mintPost.current;
         const [st, objs, runList] = await Promise.all([rl.status(), rl.objects(), rl.runs()]);
         if (stop) return;
         s.setObjects(objs.items, objs.selected);
@@ -113,17 +132,20 @@ export function Panel() {
             onClick={() => {
               void (async () => {
                 const s = useTwin.getState();
+                mintPost.current = true;
+                mintWasBusy.current = true;
                 s.setMintBusy(true);
-                s.log("Mint generating… this can take a few minutes");
+                s.setMintJobPrompt(s.mintPrompt);
+                s.log(`Mint generating… ${s.mintPrompt}`);
                 try {
-                  const meta = await rl.mintGenerate(s.mintPrompt);
-                  const lib = await rl.objects();
-                  s.setObjects(lib.items, lib.selected);
-                  s.log(`Saved ${meta.prompt} (${meta.id})`);
+                  await rl.mintGenerate(s.mintPrompt);
                 } catch (e) {
+                  mintWasBusy.current = false;
+                  s.setMintBusy(false);
+                  s.setMintJobPrompt("");
                   s.log(e instanceof Error ? e.message : "mint failed");
                 } finally {
-                  s.setMintBusy(false);
+                  mintPost.current = false;
                 }
               })();
             }}
@@ -131,6 +153,11 @@ export function Panel() {
             {mintBusy ? "Generating…" : "Generate"}
           </button>
         </div>
+        {mintBusy && (
+          <p className="metric">
+            generating{mintJobPrompt ? ` “${mintJobPrompt}”` : ""} · this can take a few minutes
+          </p>
+        )}
         <label className="field">
           <span>Import GLB</span>
           <input ref={glbInput} type="file" accept=".glb,model/gltf-binary" />

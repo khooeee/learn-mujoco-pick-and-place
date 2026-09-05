@@ -12,8 +12,6 @@ export type TrainStatus = {
   log_tail?: string[];
 };
 
-export type Health = { ok: boolean; mint: boolean };
-
 export type MintObject = {
   id: string;
   prompt: string;
@@ -22,6 +20,15 @@ export type MintObject = {
   h?: number;
   scale?: number;
   has_glb?: boolean;
+};
+
+export type Health = {
+  ok: boolean;
+  mint: boolean;
+  mint_busy?: boolean;
+  mint_prompt?: string;
+  mint_error?: string | null;
+  mint_last?: MintObject | null;
 };
 
 export type RunRow = {
@@ -84,7 +91,7 @@ export const rl = {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ prompt }),
-    }) as Promise<MintObject>,
+    }) as Promise<{ ok: boolean; busy: boolean; prompt: string }>,
   importGlb: (file: File, name?: string) => {
     const body = new FormData();
     body.append("file", file);

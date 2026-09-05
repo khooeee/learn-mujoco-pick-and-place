@@ -12,6 +12,7 @@ type Store = {
   episodesTarget: number;
   mintPrompt: string;
   mintBusy: boolean;
+  mintJobPrompt: string;
   mintConfigured: boolean;
   objects: MintObject[];
   selectedId: string | null;
@@ -30,6 +31,7 @@ type Store = {
   setEpisodesTarget: (n: number) => void;
   setMintPrompt: (v: string) => void;
   setMintBusy: (v: boolean) => void;
+  setMintJobPrompt: (v: string) => void;
   setMintConfigured: (v: boolean) => void;
   setObjects: (items: MintObject[], selected: string | null) => void;
   setPreview: (id: string | null, prompt?: string | null) => void;
@@ -48,6 +50,7 @@ export const useTwin = create<Store>((set) => ({
   episodesTarget: 1000,
   mintPrompt: "small ceramic mug",
   mintBusy: false,
+  mintJobPrompt: "",
   mintConfigured: false,
   objects: [],
   selectedId: null,
@@ -69,6 +72,7 @@ export const useTwin = create<Store>((set) => ({
   setEpisodesTarget: (episodesTarget) => set({ episodesTarget }),
   setMintPrompt: (mintPrompt) => set({ mintPrompt }),
   setMintBusy: (mintBusy) => set({ mintBusy }),
+  setMintJobPrompt: (mintJobPrompt) => set({ mintJobPrompt }),
   setMintConfigured: (mintConfigured) => set({ mintConfigured }),
   setObjects: (objects, selectedId) => set({ objects: objects ?? [], selectedId }),
   setPreview: (previewId, previewPrompt = null) =>

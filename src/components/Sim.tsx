@@ -16,7 +16,7 @@ export function Sim() {
           <p>
             {running
               ? "Training is headless. Render an episode from the list when you want to watch."
-              : "Train, then click render mp4 on an episode. The robot only appears in those videos."}
+              : "Pick an object (or primitives), train, then render an episode mp4."}
           </p>
         </div>
       )}

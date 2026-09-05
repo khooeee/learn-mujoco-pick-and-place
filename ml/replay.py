@@ -18,7 +18,16 @@ RUNS = ROOT / "runs"
 def spec_from_row(row: dict) -> ObjectSpec:
     o = row["object"]
     rgba = tuple(o.get("rgba") or [0.85, 0.38, 0.16, 1.0])
-    return ObjectSpec(o["x"], o["y"], o["z"], o["h"], o["w"], int(o["shape"]), rgba)  # type: ignore[arg-type]
+    return ObjectSpec(
+        o["x"],
+        o["y"],
+        o["z"],
+        o["h"],
+        o["w"],
+        int(o["shape"]),
+        rgba,  # type: ignore[arg-type]
+        mesh_id=o.get("mesh_id"),
+    )
 
 
 def render_episode(run_id: str, index: int, video: Path | None, view: bool) -> Path | None:

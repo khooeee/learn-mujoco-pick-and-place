@@ -31,6 +31,11 @@ export function Panel() {
   const renderBusy = useTwin((s) => s.renderBusy);
   const videoUrl = useTwin((s) => s.videoUrl);
   const episodesTarget = useTwin((s) => s.episodesTarget);
+  const mintPrompt = useTwin((s) => s.mintPrompt);
+  const mintBusy = useTwin((s) => s.mintBusy);
+  const mintConfigured = useTwin((s) => s.mintConfigured);
+  const objects = useTwin((s) => s.objects);
+  const selectedId = useTwin((s) => s.selectedId);
 
   useEffect(() => {
     let stop = false;
@@ -41,8 +46,10 @@ export function Panel() {
         if (stop) return;
         s.setRlOnline(Boolean(health));
         if (!health) return;
-        const st = await rl.status();
+        s.setMintConfigured(Boolean(health.mint));
+        const [st, objs] = await Promise.all([rl.status(), rl.objects()]);
         if (stop) return;
+        s.setObjects(objs.items, objs.selected);
         s.setStatus(st);
         if (st.run_id) s.setRunId(st.run_id);
         const id = st.run_id || s.runId;
@@ -73,15 +80,107 @@ export function Panel() {
         <h1>TwinPick</h1>
         <p className="lede">
           Training is vision RL in MuJoCo on a real SO-101: cameras in, joints
-          out, lift reward. No IK. Replay any episode as an mp4.
+          out, lift reward. Replay any episode as an mp4.
         </p>
         <p className="metric">
           trainer {rlOnline ? "connected" : "offline — run python ml/server.py"}
+          {rlOnline ? ` · mint ${mintConfigured ? "ready" : "off (set MINT_API_KEY)"}` : ""}
         </p>
       </header>
 
       <section>
-        <h2>1. Train (headless MuJoCo)</h2>
+        <h2>1. Object</h2>
+        <p className="hint">
+          Mint builds a mesh from a prompt, then we rescale it to 7 cm and save it.
+          Use any saved object; the next episode picks it up. Primitives = random
+          boxes and cylinders.
+        </p>
+        <label className="field">
+          <span>Prompt</span>
+          <textarea
+            rows={2}
+            value={mintPrompt}
+            onChange={(e) => useTwin.getState().setMintPrompt(e.target.value)}
+          />
+        </label>
+        <div className="row">
+          <button
+            className="primary"
+            disabled={!rlOnline || mintBusy || !mintConfigured}
+            onClick={() => {
+              void (async () => {
+                const s = useTwin.getState();
+                s.setMintBusy(true);
+                s.log("Mint generating… this can take a few minutes");
+                try {
+                  const meta = await rl.mintGenerate(s.mintPrompt);
+                  const lib = await rl.objects();
+                  s.setObjects(lib.items, lib.selected);
+                  s.log(`Saved ${meta.prompt} (${meta.id})`);
+                } catch (e) {
+                  s.log(e instanceof Error ? e.message : "mint failed");
+                } finally {
+                  s.setMintBusy(false);
+                }
+              })();
+            }}
+          >
+            {mintBusy ? "Generating…" : "Generate"}
+          </button>
+          <button
+            className={!selectedId ? "on" : ""}
+            disabled={!rlOnline}
+            onClick={() => {
+              void (async () => {
+                const s = useTwin.getState();
+                try {
+                  const lib = await rl.selectObject(null);
+                  s.setObjects(lib.items, lib.selected);
+                  s.log("Using random boxes / cylinders");
+                } catch (e) {
+                  s.log(e instanceof Error ? e.message : "select failed");
+                }
+              })();
+            }}
+          >
+            Primitives
+          </button>
+        </div>
+        <div className="olist">
+          {(objects ?? []).length === 0 && <p className="hint">No saved objects yet.</p>}
+          {(objects ?? []).map((o) => (
+            <div className={o.id === selectedId ? "ob sel" : "ob"} key={o.id}>
+              <span>
+                {o.prompt}
+                <p>
+                  {(o.w ?? 0).toFixed(3)} × {(o.h ?? 0).toFixed(3)} m · {o.created ?? o.id}
+                </p>
+              </span>
+              <button
+                className={o.id === selectedId ? "on" : ""}
+                disabled={!rlOnline}
+                onClick={() => {
+                  void (async () => {
+                    const s = useTwin.getState();
+                    try {
+                      const lib = await rl.selectObject(o.id);
+                      s.setObjects(lib.items, lib.selected);
+                      s.log(`Using ${o.prompt}`);
+                    } catch (e) {
+                      s.log(e instanceof Error ? e.message : "select failed");
+                    }
+                  })();
+                }}
+              >
+                {o.id === selectedId ? "selected" : "use"}
+              </button>
+            </div>
+          ))}
+        </div>
+      </section>
+
+      <section>
+        <h2>2. Train (headless MuJoCo)</h2>
         <label className="field">
           <span>Episodes</span>
           <input
@@ -148,7 +247,7 @@ export function Panel() {
       </section>
 
       <section>
-        <h2>2. Episodes</h2>
+        <h2>3. Episodes</h2>
         <p className="hint">Training stays headless. Click render, wait, then watch the mp4.</p>
         {videoUrl && (
           <button onClick={() => useTwin.getState().setVideoUrl(null)}>Clear video</button>

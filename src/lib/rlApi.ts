@@ -12,6 +12,16 @@ export type TrainStatus = {
   log_tail?: string[];
 };
 
+export type Health = { ok: boolean; mint: boolean };
+
+export type MintObject = {
+  id: string;
+  prompt: string;
+  created?: string;
+  w?: number;
+  h?: number;
+};
+
 export type EpisodeRow = {
   index: number;
   success: boolean;
@@ -24,7 +34,14 @@ async function req(path: string, init?: RequestInit) {
   const res = await fetch(PREFIX + path, init);
   if (!res.ok) {
     const t = await res.text();
-    throw new Error(t || res.statusText);
+    let msg = t || res.statusText;
+    try {
+      const j = JSON.parse(t) as { detail?: string };
+      if (typeof j.detail === "string") msg = j.detail;
+    } catch {
+      /* keep raw body */
+    }
+    throw new Error(msg);
   }
   const ct = res.headers.get("content-type") || "";
   if (ct.includes("application/json")) return res.json();
@@ -32,7 +49,27 @@ async function req(path: string, init?: RequestInit) {
 }
 
 export const rl = {
-  health: () => req("/health").catch(() => null),
+  health: (): Promise<Health | null> => req("/health").catch(() => null),
+  objects: async () => {
+    const raw = await req("/objects");
+    if (Array.isArray(raw)) {
+      return { selected: null as string | null, items: [] as MintObject[] };
+    }
+    const row = raw as { selected?: string | null; items?: MintObject[] };
+    return { selected: row.selected ?? null, items: row.items ?? [] };
+  },
+  selectObject: (id: string | null) =>
+    req("/objects/select", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ id }),
+    }) as Promise<{ selected: string | null; items: MintObject[] }>,
+  mintGenerate: (prompt: string) =>
+    req("/mint/generate", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ prompt }),
+    }) as Promise<MintObject>,
   status: (): Promise<TrainStatus> => req("/status"),
   start: (episodes: number, resume = false) =>
     req("/train/start", {

@@ -9,6 +9,8 @@ export default defineConfig({
       "/rl": {
         target: "http://127.0.0.1:8765",
         changeOrigin: true,
+        timeout: 1_800_000,
+        proxyTimeout: 1_800_000,
         rewrite: (p) => p.replace(/^\/rl/, ""),
       },
     },

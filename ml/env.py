@@ -1,15 +1,20 @@
-"""SO-101 pick env: cameras + joints in, joint targets out. No IK."""
+"""SO-101 pick env: cameras + joints in, joint targets out."""
 
 from __future__ import annotations
 
 from dataclasses import dataclass
 from pathlib import Path
+import shutil
 
 import mujoco
 import numpy as np
 
+from library import load_meta, selected_id, stl_path
+
 ROOT = Path(__file__).resolve().parent
 SCENE = ROOT / "so101" / "pick_scene.xml"
+SCENE_MESH = ROOT / "so101" / "pick_mesh.xml"
+RUNTIME_STL = ROOT / "so101" / "assets" / "runtime_object.stl"
 JOINT_NAMES = [
     "shoulder_pan",
     "shoulder_lift",
@@ -29,21 +34,29 @@ class ObjectSpec:
     z: float
     h: float
     w: float
-    shape: int  # 0 box, 1 cylinder
+    shape: int  # 0 box, 1 cylinder, 2 mint mesh
     rgba: tuple[float, float, float, float]
+    mesh_id: str | None = None
 
 
 class PickEnv:
     def __init__(self, render: bool = True, seed: int = 0, img_size: int = IMG) -> None:
-        self.model = mujoco.MjModel.from_xml_path(str(SCENE))
-        self.data = mujoco.MjData(self.model)
         self.rng = np.random.default_rng(seed)
         self.render_enabled = render
         self.img_size = img_size
         self.renderer: mujoco.Renderer | None = None
-        if render:
-            self.renderer = mujoco.Renderer(self.model, height=img_size, width=img_size)
+        self.n_act = 6
+        self.action_repeat = 8
+        self.max_actions = 80
+        self._t = 0
+        self._mesh_id = None
+        self.model = None  # type: ignore[assignment]
+        self.data = None  # type: ignore[assignment]
+        self.spec = ObjectSpec(0.22, 0.0, 0.07, 0.056, 0.044, 0, (0.85, 0.38, 0.16, 1.0))
+        self._start_z = TABLE_TOP
+        self._load_scene(None)
 
+    def _bind(self) -> None:
         self.act_ids = np.array(
             [self.model.actuator(n).id for n in JOINT_NAMES], dtype=np.int32
         )
@@ -54,53 +67,78 @@ class PickEnv:
         self.grip_site = mujoco.mj_name2id(self.model, mujoco.mjtObj.mjOBJ_SITE, "gripperframe")
         self.grip_body = self.model.body("gripper").id
         self.overhead_cam = mujoco.mj_name2id(self.model, mujoco.mjtObj.mjOBJ_CAMERA, "overhead")
-        self.n_act = 6
-        self.action_repeat = 8
-        self.max_actions = 80
-        self._t = 0
-        self.spec = ObjectSpec(0.22, 0.0, 0.07, 0.056, 0.044, 0, (0.85, 0.38, 0.16, 1.0))
-        self._start_z = TABLE_TOP
+        if self.render_enabled:
+            self.renderer = mujoco.Renderer(self.model, height=self.img_size, width=self.img_size)
 
-    def _set_object(self, spec: ObjectSpec) -> None:
+    def _load_scene(self, mesh_id: str | None) -> None:
+        if mesh_id == self._mesh_id and self.model is not None:
+            return
+        self.renderer = None
+        if mesh_id:
+            src = stl_path(mesh_id)
+            if not src.exists():
+                raise FileNotFoundError(f"object {mesh_id} has no STL")
+            shutil.copy(src, RUNTIME_STL)
+            self.model = mujoco.MjModel.from_xml_path(str(SCENE_MESH))
+        else:
+            self.model = mujoco.MjModel.from_xml_path(str(SCENE))
+        self.data = mujoco.MjData(self.model)
+        self._mesh_id = mesh_id
+        self._bind()
+
+    def _place_object(self, spec: ObjectSpec) -> None:
         self.spec = spec
         gid = self.obj_geom
-        if spec.shape == 1:
-            self.model.geom_type[gid] = mujoco.mjtGeom.mjGEOM_CYLINDER
-            self.model.geom_size[gid][:] = np.array([spec.w / 2, spec.h / 2, 0.0])
-        else:
-            self.model.geom_type[gid] = mujoco.mjtGeom.mjGEOM_BOX
-            self.model.geom_size[gid][:] = np.array([spec.w / 2, spec.w / 2, spec.h / 2])
-        self.model.geom_rgba[gid][:] = spec.rgba
+        if spec.shape != 2:
+            if spec.shape == 1:
+                self.model.geom_type[gid] = mujoco.mjtGeom.mjGEOM_CYLINDER
+                self.model.geom_size[gid][:] = np.array([spec.w / 2, spec.h / 2, 0.0])
+            else:
+                self.model.geom_type[gid] = mujoco.mjtGeom.mjGEOM_BOX
+                self.model.geom_size[gid][:] = np.array([spec.w / 2, spec.w / 2, spec.h / 2])
+            self.model.geom_rgba[gid][:] = spec.rgba
         self.data.qpos[-7] = spec.x
         self.data.qpos[-6] = spec.y
         self.data.qpos[-5] = spec.z
         self.data.qpos[-4:] = np.array([1.0, 0.0, 0.0, 0.0])
         self.data.qvel[-6:] = 0.0
 
+    def _set_object(self, spec: ObjectSpec) -> None:
+        self._load_scene(spec.mesh_id)
+        self._place_object(spec)
+
     def random_spec(self) -> ObjectSpec:
+        x = float(0.16 + self.rng.random() * 0.14)
+        y = float(-0.10 + self.rng.random() * 0.20)
+        oid = selected_id()
+        if oid:
+            meta = load_meta(oid)
+            h = float(meta.get("h") or 0.06)
+            w = float(meta.get("w") or 0.05)
+            return ObjectSpec(
+                x, y, TABLE_TOP + 0.002, h, w, 2, (0.85, 0.38, 0.16, 1.0), mesh_id=oid
+            )
         h = float(0.04 + self.rng.random() * 0.05)
         w = float(0.03 + self.rng.random() * 0.03)
         shape = int(self.rng.integers(0, 2))
-        x = float(0.16 + self.rng.random() * 0.14)
-        y = float(-0.10 + self.rng.random() * 0.20)
-        z = TABLE_TOP + h / 2 + 0.002
         rgba = (
             float(0.4 + self.rng.random() * 0.55),
             float(0.2 + self.rng.random() * 0.5),
             float(0.1 + self.rng.random() * 0.4),
             1.0,
         )
-        return ObjectSpec(x, y, z, h, w, shape, rgba)
+        return ObjectSpec(x, y, TABLE_TOP + h / 2 + 0.002, h, w, shape, rgba)
 
     def reset(self, seed: int | None = None, spec: ObjectSpec | None = None) -> dict:
         if seed is not None:
             self.rng = np.random.default_rng(seed)
+        spec = spec or self.random_spec()
+        self._load_scene(spec.mesh_id)
         mujoco.mj_resetData(self.model, self.data)
         mid = 0.5 * (self.ctrl_lo + self.ctrl_hi)
         self.data.ctrl[self.act_ids] = mid
         self.data.qpos[:6] = mid
-        spec = spec or self.random_spec()
-        self._set_object(spec)
+        self._place_object(spec)
         self._start_z = spec.z
         self._t = 0
         for _ in range(20):
@@ -182,6 +220,7 @@ class PickEnv:
                 "w": self.spec.w,
                 "shape": self.spec.shape,
                 "rgba": list(self.spec.rgba),
+                "mesh_id": self.spec.mesh_id,
             },
         }
         return self.observe(), float(reward), bool(done), info

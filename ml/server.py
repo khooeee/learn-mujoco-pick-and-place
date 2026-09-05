@@ -17,6 +17,8 @@ from fastapi.responses import FileResponse
 from pydantic import BaseModel
 
 from log import read_json, read_jsonl
+from library import list_objects, selected_id, set_selected
+from mint import api_key, generate_from_prompt, load_dotenv
 from replay import render_episode
 
 ROOT = Path(__file__).resolve().parent
@@ -36,12 +38,21 @@ app.add_middleware(
 _proc: subprocess.Popen | None = None
 _run_id: str | None = None
 _log: list[str] = []
+_mint_busy = False
 
 
 class TrainReq(BaseModel):
     episodes: int = 200
     seed: int = 0
     resume: bool = False
+
+
+class MintReq(BaseModel):
+    prompt: str
+
+
+class SelectReq(BaseModel):
+    id: str | None
 
 
 class RenderReq(BaseModel):
@@ -78,7 +89,8 @@ def _status_from_disk() -> dict:
 
 @app.get("/health")
 def health():
-    return {"ok": True}
+    load_dotenv()
+    return {"ok": True, "mint": bool(api_key())}
 
 
 @app.get("/status")
@@ -217,10 +229,37 @@ def latest_eval(run_id: str):
 
 @app.get("/objects")
 def objects():
-    return [p.name for p in OBJECTS.glob("*") if p.suffix.lower() in {".glb", ".png", ".jpg"}]
+    return {"selected": selected_id(), "items": list_objects()}
+
+
+@app.post("/objects/select")
+def objects_select(req: SelectReq):
+    try:
+        set_selected(req.id)
+    except FileNotFoundError as e:
+        raise HTTPException(404, f"unknown object {e}") from e
+    return {"selected": selected_id(), "items": list_objects()}
+
+
+@app.post("/mint/generate")
+def mint_generate(req: MintReq):
+    global _mint_busy
+    if _mint_busy:
+        raise HTTPException(409, "Mint is already generating")
+    if not api_key():
+        raise HTTPException(400, "Set MINT_API_KEY in .env (https://platform.mint.gg)")
+    _mint_busy = True
+    try:
+        meta = generate_from_prompt(req.prompt)
+    except RuntimeError as e:
+        raise HTTPException(400, str(e)) from e
+    finally:
+        _mint_busy = False
+    return meta
 
 
 if __name__ == "__main__":
     import uvicorn
 
+    load_dotenv()
     uvicorn.run(app, host="127.0.0.1", port=int(os.environ.get("RL_PORT", "8765")))

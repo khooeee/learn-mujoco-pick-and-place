@@ -1,5 +1,5 @@
 import { create } from "zustand";
-import type { EpisodeRow, TrainStatus } from "./lib/rlApi";
+import type { EpisodeRow, MintObject, TrainStatus } from "./lib/rlApi";
 
 type LogItem = { t: number; text: string };
 
@@ -13,6 +13,11 @@ type Store = {
   videoUrl: string | null;
   renderBusy: number | null;
   episodesTarget: number;
+  mintPrompt: string;
+  mintBusy: boolean;
+  mintConfigured: boolean;
+  objects: MintObject[];
+  selectedId: string | null;
   log: (text: string) => void;
   setRlOnline: (v: boolean) => void;
   setStatus: (s: TrainStatus | null) => void;
@@ -22,6 +27,10 @@ type Store = {
   setVideoUrl: (u: string | null) => void;
   setRenderBusy: (n: number | null) => void;
   setEpisodesTarget: (n: number) => void;
+  setMintPrompt: (v: string) => void;
+  setMintBusy: (v: boolean) => void;
+  setMintConfigured: (v: boolean) => void;
+  setObjects: (items: MintObject[], selected: string | null) => void;
 };
 
 export const useTwin = create<Store>((set) => ({
@@ -34,6 +43,11 @@ export const useTwin = create<Store>((set) => ({
   videoUrl: null,
   renderBusy: null,
   episodesTarget: 200,
+  mintPrompt: "small ceramic mug",
+  mintBusy: false,
+  mintConfigured: false,
+  objects: [],
+  selectedId: null,
   log: (text) =>
     set((s) => ({
       logs: [{ t: Date.now(), text }, ...s.logs].slice(0, 24),
@@ -46,4 +60,8 @@ export const useTwin = create<Store>((set) => ({
   setVideoUrl: (videoUrl) => set({ videoUrl }),
   setRenderBusy: (renderBusy) => set({ renderBusy }),
   setEpisodesTarget: (episodesTarget) => set({ episodesTarget }),
+  setMintPrompt: (mintPrompt) => set({ mintPrompt }),
+  setMintBusy: (mintBusy) => set({ mintBusy }),
+  setMintConfigured: (mintConfigured) => set({ mintConfigured }),
+  setObjects: (objects, selectedId) => set({ objects: objects ?? [], selectedId }),
 }));

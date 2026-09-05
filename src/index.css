@@ -90,13 +90,41 @@ body,
   border-bottom: 1px solid #2a241e;
 }
 
-.field input[type="number"] {
+.field input[type="number"],
+.field textarea {
   background: #120f0c;
   color: #f3ece4;
   border: 1px solid #3a3128;
   border-radius: 8px;
   padding: 6px 8px;
   font: inherit;
+  resize: vertical;
+}
+
+.olist {
+  max-height: 180px;
+  overflow: auto;
+  margin: 8px 0 0;
+}
+
+.ob {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 8px;
+  font-size: 12px;
+  padding: 8px 0;
+  border-bottom: 1px solid #2a241e;
+}
+
+.ob.sel span {
+  color: #ffd3b0;
+}
+
+.ob p {
+  margin: 2px 0 0;
+  color: #9a8b7c;
+  font-size: 11px;
 }
 
 .panel {

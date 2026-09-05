@@ -1,40 +1,43 @@
-TwinPick — photo of a real table, robot arm in the browser, small pick policy on your Mac.
+# TwinPick — SO-101 vision RL
 
-## Run the sim (no API keys)
+Photo ingest in the browser. **Pick is trained in MuJoCo** on the official SO-101 arm: cameras in, joint targets out, lift reward. **No IK.** Replay any episode as mp4.
+
+## Setup
 
 ```bash
 npm install
-npm run dev
+python3 -m venv ml/.venv
+ml/.venv/bin/pip install -r ml/requirements.txt
+```
+
+## Run (two terminals)
+
+```bash
+npm run rl          # API on :8765
+npm run dev         # UI on :5173
 ```
 
 Open http://localhost:5173
 
-1. Drop a table photo (it textures the stand-in table).
-2. Drop an object photo (it wraps the stand-in cup).
-3. Click **Train pick policy** (a few seconds).
-4. Click **New cup spot**, then **Pick it up**. Switch Expert IK vs Learned.
+1. **Train** — headless PPO on MPS. Watch episode / success rate / log.
+2. **Episodes → render mp4** — waits, then plays in the stage.
+3. Optional: table/object photos + World Labs / Tripo / Mint (Convex keys). v1 training still randomizes boxes and cylinders.
 
-## Cloud 3D (World Labs, Tripo, mint) via Convex
-
-```bash
-npx convex dev
-```
-
-Log in, create a project. Then:
+CLI instead of the UI:
 
 ```bash
-npx convex env set WORLD_LABS_API_KEY ...
-npx convex env set TRIPO_API_KEY ...
-npx convex env set MINT_API_KEY ...
+cd ml
+.venv/bin/python train_rl.py --run demo --episodes 200
+.venv/bin/python replay.py --run demo --episode 12 --mp4
+.venv/bin/python replay.py --run demo --episode 12 --view
 ```
 
-Put the printed `VITE_CONVEX_URL` in `.env.local`. Restart Vite. The three generate buttons turn on.
+## What this is
 
-## Optional PyTorch on the M5
+- Robot: `ml/so101/` (TheRobotStudio SO-101 MJCF)
+- Actor: small CNN on overhead + wrist views + joints
+- Critic: those **plus** object pose (training only)
+- Actions: 6 SO-101 actuators, no inverse kinematics
+- Reward: reach object and lift it
 
-```bash
-pip install torch
-python ml/train_pick.py
-```
-
-Writes `ml/policy.json` (same net layout as the browser trainer).
+Not SmolVLA / ACT. Not the old browser IK toy arm.

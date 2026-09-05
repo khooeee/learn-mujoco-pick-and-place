@@ -1,13 +1,16 @@
-/** Tiny 3→32→3 MLP. Trained with SGD in the browser (and optionally PyTorch). */
+/** 6→64→64→3 MLP: object pose + size + shape → grasp point. */
 
 export type MLP = {
   inSize: number;
-  hidden: number;
+  h1: number;
+  h2: number;
   outSize: number;
   W1: number[];
   b1: number[];
   W2: number[];
   b2: number[];
+  W3: number[];
+  b3: number[];
 };
 
 function randn() {
@@ -16,18 +19,27 @@ function randn() {
   return Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * v);
 }
 
-export function initMLP(inSize = 3, hidden = 32, outSize = 3): MLP {
-  const scale1 = Math.sqrt(2 / inSize);
-  const scale2 = Math.sqrt(2 / hidden);
+function fill(n: number, scale: number) {
+  return Array.from({ length: n }, () => randn() * scale);
+}
+
+export function initMLP(inSize = 6, h1 = 64, h2 = 64, outSize = 3): MLP {
   return {
     inSize,
-    hidden,
+    h1,
+    h2,
     outSize,
-    W1: Array.from({ length: hidden * inSize }, () => randn() * scale1),
-    b1: Array(hidden).fill(0),
-    W2: Array.from({ length: outSize * hidden }, () => randn() * scale2),
-    b2: Array(outSize).fill(0),
+    W1: fill(h1 * inSize, Math.sqrt(2 / inSize)),
+    b1: Array(h1).fill(0),
+    W2: fill(h2 * h1, Math.sqrt(2 / h1)),
+    b2: Array(h2).fill(0),
+    W3: fill(outSize * h2, Math.sqrt(2 / h2)),
+    b3: Array(outSize).fill(0),
   };
+}
+
+export function paramCount(m: MLP) {
+  return m.W1.length + m.b1.length + m.W2.length + m.b2.length + m.W3.length + m.b3.length;
 }
 
 function tanh(x: number) {
@@ -35,16 +47,22 @@ function tanh(x: number) {
 }
 
 export function forward(m: MLP, x: number[]): number[] {
-  const h = new Array(m.hidden);
-  for (let i = 0; i < m.hidden; i++) {
+  const a1 = new Array(m.h1);
+  for (let i = 0; i < m.h1; i++) {
     let s = m.b1[i];
     for (let j = 0; j < m.inSize; j++) s += m.W1[i * m.inSize + j] * x[j];
-    h[i] = tanh(s);
+    a1[i] = tanh(s);
+  }
+  const a2 = new Array(m.h2);
+  for (let i = 0; i < m.h2; i++) {
+    let s = m.b2[i];
+    for (let j = 0; j < m.h1; j++) s += m.W2[i * m.h1 + j] * a1[j];
+    a2[i] = tanh(s);
   }
   const y = new Array(m.outSize);
   for (let i = 0; i < m.outSize; i++) {
-    let s = m.b2[i];
-    for (let j = 0; j < m.hidden; j++) s += m.W2[i * m.hidden + j] * h[j];
+    let s = m.b3[i];
+    for (let j = 0; j < m.h2; j++) s += m.W3[i * m.h2 + j] * a2[j];
     y[i] = s;
   }
   return y;
@@ -54,25 +72,31 @@ export function trainEpoch(m: MLP, xs: number[][], ys: number[][], lr: number): 
   const n = xs.length;
   let loss = 0;
   const gW1 = new Array(m.W1.length).fill(0);
-  const gb1 = new Array(m.hidden).fill(0);
+  const gb1 = new Array(m.h1).fill(0);
   const gW2 = new Array(m.W2.length).fill(0);
-  const gb2 = new Array(m.outSize).fill(0);
+  const gb2 = new Array(m.h2).fill(0);
+  const gW3 = new Array(m.W3.length).fill(0);
+  const gb3 = new Array(m.outSize).fill(0);
 
   for (let k = 0; k < n; k++) {
     const x = xs[k];
     const t = ys[k];
-    const pre = new Array(m.hidden);
-    const h = new Array(m.hidden);
-    for (let i = 0; i < m.hidden; i++) {
+    const a1 = new Array(m.h1);
+    for (let i = 0; i < m.h1; i++) {
       let s = m.b1[i];
       for (let j = 0; j < m.inSize; j++) s += m.W1[i * m.inSize + j] * x[j];
-      pre[i] = s;
-      h[i] = tanh(s);
+      a1[i] = tanh(s);
+    }
+    const a2 = new Array(m.h2);
+    for (let i = 0; i < m.h2; i++) {
+      let s = m.b2[i];
+      for (let j = 0; j < m.h1; j++) s += m.W2[i * m.h1 + j] * a1[j];
+      a2[i] = tanh(s);
     }
     const y = new Array(m.outSize);
     for (let i = 0; i < m.outSize; i++) {
-      let s = m.b2[i];
-      for (let j = 0; j < m.hidden; j++) s += m.W2[i * m.hidden + j] * h[j];
+      let s = m.b3[i];
+      for (let j = 0; j < m.h2; j++) s += m.W3[i * m.h2 + j] * a2[j];
       y[i] = s;
     }
 
@@ -82,26 +106,40 @@ export function trainEpoch(m: MLP, xs: number[][], ys: number[][], lr: number): 
       loss += (y[i] - t[i]) ** 2;
     }
 
-    const dh = new Array(m.hidden).fill(0);
+    const da2 = new Array(m.h2).fill(0);
     for (let i = 0; i < m.outSize; i++) {
-      gb2[i] += dy[i];
-      for (let j = 0; j < m.hidden; j++) {
-        gW2[i * m.hidden + j] += dy[i] * h[j];
-        dh[j] += m.W2[i * m.hidden + j] * dy[i];
+      gb3[i] += dy[i];
+      for (let j = 0; j < m.h2; j++) {
+        gW3[i * m.h2 + j] += dy[i] * a2[j];
+        da2[j] += m.W3[i * m.h2 + j] * dy[i];
       }
     }
-    for (let i = 0; i < m.hidden; i++) {
-      const dt = (1 - h[i] * h[i]) * dh[i];
-      gb1[i] += dt;
-      for (let j = 0; j < m.inSize; j++) gW1[i * m.inSize + j] += dt * x[j];
+    const dz2 = da2.map((v, i) => (1 - a2[i] * a2[i]) * v);
+    const da1 = new Array(m.h1).fill(0);
+    for (let i = 0; i < m.h2; i++) {
+      gb2[i] += dz2[i];
+      for (let j = 0; j < m.h1; j++) {
+        gW2[i * m.h1 + j] += dz2[i] * a1[j];
+        da1[j] += m.W2[i * m.h1 + j] * dz2[i];
+      }
+    }
+    const dz1 = da1.map((v, i) => (1 - a1[i] * a1[i]) * v);
+    for (let i = 0; i < m.h1; i++) {
+      gb1[i] += dz1[i];
+      for (let j = 0; j < m.inSize; j++) gW1[i * m.inSize + j] += dz1[i] * x[j];
     }
   }
 
   const inv = 1 / n;
   loss = loss / (n * m.outSize);
-  for (let i = 0; i < m.W1.length; i++) m.W1[i] -= lr * gW1[i] * inv;
-  for (let i = 0; i < m.b1.length; i++) m.b1[i] -= lr * gb1[i] * inv;
-  for (let i = 0; i < m.W2.length; i++) m.W2[i] -= lr * gW2[i] * inv;
-  for (let i = 0; i < m.b2.length; i++) m.b2[i] -= lr * gb2[i] * inv;
+  const step = (arr: number[], g: number[]) => {
+    for (let i = 0; i < arr.length; i++) arr[i] -= lr * g[i] * inv;
+  };
+  step(m.W1, gW1);
+  step(m.b1, gb1);
+  step(m.W2, gW2);
+  step(m.b2, gb2);
+  step(m.W3, gW3);
+  step(m.b3, gb3);
   return loss;
 }

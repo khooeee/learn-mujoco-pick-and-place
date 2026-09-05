@@ -7,11 +7,12 @@
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview",
-    "convex": "convex dev"
+    "rl": "ml/.venv/bin/python ml/server.py"
   },
   "dependencies": {
     "@react-three/drei": "^10.7.8",
     "@react-three/fiber": "^9.7.0",
+    "@react-three/rapier": "^2.2.0",
     "@sparkjsdev/spark": "^2.1.0",
     "convex": "^1.45.0",
     "react": "^19.2.8",

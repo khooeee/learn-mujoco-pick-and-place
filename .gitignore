@@ -7,4 +7,6 @@ convex/_generated/server*
 *.pyc
 __pycache__/
 .venv/
+ml/runs/
+ml/.venv/
 notes.md

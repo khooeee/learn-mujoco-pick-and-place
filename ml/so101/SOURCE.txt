@@ -1,0 +1,3 @@
+SO-101 MJCF, URDF, and STL meshes copied from
+https://github.com/TheRobotStudio/SO-ARM100
+path Simulation/SO101 (Apache-2.0 / see upstream).

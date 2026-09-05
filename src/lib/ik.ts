@@ -1,6 +1,6 @@
 export const L1 = 0.36;
 export const L2 = 0.32;
-export const BASE = { x: -0.62, y: 0.04, z: 0 } as const;
+export const BASE = { x: -0.62, y: 0.12, z: 0 } as const;
 
 export type Joints = { yaw: number; shoulder: number; elbow: number };
 
@@ -47,6 +47,6 @@ export function lerpJoints(a: Joints, b: Joints, t: number): Joints {
   };
 }
 
-export const HOME: Joints = { yaw: 0.4, shoulder: 1.15, elbow: 1.35 };
+export const HOME: Joints = { yaw: 0.55, shoulder: 0.85, elbow: 1.15 };
 
 export type ArmStep = { joints: Joints; hold?: boolean; ms: number };

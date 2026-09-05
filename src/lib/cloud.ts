@@ -76,7 +76,7 @@ export async function generateObjectWithTripo() {
     const out = (await callAction("generate.objectFromPhoto", { storageId })) as {
       glbUrl?: string;
     };
-    st.setCloud({ objectStatus: "ready", cupGlbUrl: out.glbUrl });
+    st.setCloud({ objectStatus: "ready", objectGlbUrl: out.glbUrl });
     st.log("Tripo object is in the scene");
   } catch (e) {
     st.setCloud({ objectStatus: "error" });
@@ -89,8 +89,8 @@ export async function generateBoxWithMint() {
   st.setCloud({ mintStatus: "mint generating…" });
   try {
     const out = (await callAction("generate.boxFromMint", {})) as { glbUrl?: string };
-    st.setCloud({ mintStatus: "ready", boxGlbUrl: out.glbUrl });
-    st.log("mint drop-box is in the scene");
+    st.setCloud({ mintStatus: "ready", objectGlbUrl: out.glbUrl });
+    st.log("mint object is in the scene — this is what the arm will pick");
   } catch (e) {
     st.setCloud({ mintStatus: "error" });
     st.log(`mint: ${e instanceof Error ? e.message : "failed"}`);

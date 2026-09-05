@@ -1,7 +1,7 @@
-import { trainPolicy } from "../lib/policy";
-import { queuePick } from "./Sim";
-import { useTwin } from "../store";
+import { useEffect } from "react";
 import { generateBoxWithMint, generateObjectWithTripo, generateWorldWithMarble } from "../lib/cloud";
+import { rl } from "../lib/rlApi";
+import { useTwin } from "../store";
 
 function PhotoField({
   label,
@@ -32,80 +32,133 @@ function PhotoField({
   );
 }
 
+function RateChart({ points }: { points: { episode: number; rate: number }[] }) {
+  if (points.length < 2) return <p className="hint">Success curve appears after a few episodes.</p>;
+  const w = 320;
+  const h = 72;
+  const maxX = Math.max(...points.map((p) => p.episode), 1);
+  const d = points
+    .map((p, i) => {
+      const x = (p.episode / maxX) * w;
+      const y = h - p.rate * (h - 6) - 3;
+      return `${i === 0 ? "M" : "L"}${x.toFixed(1)},${y.toFixed(1)}`;
+    })
+    .join(" ");
+  return (
+    <svg className="chart" viewBox={`0 0 ${w} ${h}`} width="100%" height="72">
+      <path d={d} fill="none" stroke="#e85d04" strokeWidth="2" />
+    </svg>
+  );
+}
+
 export function Panel() {
   const tablePhoto = useTwin((s) => s.tablePhoto);
   const objectPhoto = useTwin((s) => s.objectPhoto);
-  const brain = useTwin((s) => s.brain);
-  const net = useTwin((s) => s.net);
-  const lastLoss = useTwin((s) => s.lastLoss);
-  const losses = useTwin((s) => s.losses);
   const logs = useTwin((s) => s.logs);
   const cloud = useTwin((s) => s.cloud);
-  const pickBusy = useTwin((s) => s.pickBusy);
+  const rlOnline = useTwin((s) => s.rlOnline);
+  const status = useTwin((s) => s.status);
+  const runId = useTwin((s) => s.runId);
+  const episodes = useTwin((s) => s.episodes);
+  const metrics = useTwin((s) => s.metrics);
+  const renderBusy = useTwin((s) => s.renderBusy);
+  const videoUrl = useTwin((s) => s.videoUrl);
+  const episodesTarget = useTwin((s) => s.episodesTarget);
   const convexOn = Boolean(import.meta.env.VITE_CONVEX_URL);
+
+  useEffect(() => {
+    let stop = false;
+    const tick = async () => {
+      const s = useTwin.getState();
+      try {
+        const health = await rl.health();
+        if (stop) return;
+        s.setRlOnline(Boolean(health));
+        if (!health) return;
+        const st = await rl.status();
+        if (stop) return;
+        s.setStatus(st);
+        if (st.run_id) s.setRunId(st.run_id);
+        const id = st.run_id || s.runId;
+        if (id) {
+          const [eps, met] = await Promise.all([rl.episodes(id), rl.metrics(id)]);
+          if (stop) return;
+          s.setEpisodes(eps);
+          s.setMetrics(met);
+        }
+      } catch {
+        if (!stop) s.setRlOnline(false);
+      }
+    };
+    void tick();
+    const id = window.setInterval(() => void tick(), 1500);
+    return () => {
+      stop = true;
+      window.clearInterval(id);
+    };
+  }, []);
+
+  const running = status?.state === "running" || status?.alive;
 
   return (
     <aside className="panel">
       <header>
-        <p className="kicker">Physical AI · photo twin</p>
+        <p className="kicker">Physical AI · SO-101 · PPO</p>
         <h1>TwinPick</h1>
         <p className="lede">
-          Photo of a real table becomes the scene. A small network learns how to
-          bend the arm (copying classic IK). Cloud tools make the 3D room and
-          objects — they are not the robot brain.
+          Photos become optional 3D assets. Training is vision RL in MuJoCo on a
+          real SO-101 model: cameras in, joints out, lift reward. No IK. Replay
+          any episode as an mp4.
+        </p>
+        <p className="metric">
+          trainer {rlOnline ? "connected" : "offline — run python ml/server.py"}
         </p>
       </header>
 
       <section>
-        <h2>1. Reality</h2>
+        <h2>1. Reality (optional ingest)</h2>
         <PhotoField
           label="Photo of the table"
-          hint="This is the room. World Labs turns it into a 3D world."
+          hint="Backdrop only. World Labs is visual, not MuJoCo collision."
           value={tablePhoto}
           onChange={(url) => {
             useTwin.getState().setTablePhoto(url);
-            useTwin.getState().log("Table photo loaded (shown on the fake table until Marble finishes)");
+            useTwin.getState().log("Table photo loaded");
           }}
         />
         <PhotoField
-          label="Photo of the object to pick"
-          hint="Cup, can, snack — Tripo turns this into a 3D object."
+          label="Photo of an object"
+          hint="Tripo mesh for later mix. v1 train uses random boxes/cylinders."
           value={objectPhoto}
           onChange={(url) => {
             useTwin.getState().setObjectPhoto(url);
-            useTwin.getState().log("Object photo loaded (wrapped on the stand-in cup)");
+            useTwin.getState().log("Object photo loaded");
           }}
         />
       </section>
 
       <section>
-        <h2>2. Cloud 3D (optional until keys)</h2>
+        <h2>2. Cloud 3D</h2>
         <p className="hint">
           {convexOn
-            ? "Convex is connected. Keys live on the Convex dashboard, not in the browser."
-            : "Sim works now. For World Labs / Tripo / Mint: run npx convex dev, then set API keys with npx convex env set."}
+            ? "Convex is connected."
+            : "Sim train works without keys. For World Labs / Tripo / Mint: npx convex dev."}
         </p>
         <div className="row">
-          <button
-            disabled={!convexOn || !tablePhoto}
-            onClick={() => void generateWorldWithMarble()}
-          >
+          <button disabled={!convexOn || !tablePhoto} onClick={() => void generateWorldWithMarble()}>
             Make room · World Labs
           </button>
           <span className="status">{cloud.worldStatus}</span>
         </div>
         <div className="row">
-          <button
-            disabled={!convexOn || !objectPhoto}
-            onClick={() => void generateObjectWithTripo()}
-          >
+          <button disabled={!convexOn || !objectPhoto} onClick={() => void generateObjectWithTripo()}>
             Make object · Tripo
           </button>
           <span className="status">{cloud.objectStatus}</span>
         </div>
         <div className="row">
           <button disabled={!convexOn} onClick={() => void generateBoxWithMint()}>
-            Make drop box · mint
+            Make object · mint
           </button>
           <span className="status">{cloud.mintStatus}</span>
         </div>
@@ -117,54 +170,113 @@ export function Panel() {
       </section>
 
       <section>
-        <h2>3. Robot brain (on this Mac)</h2>
-        <p className="hint">
-          Expert = math IK. Learned = a 3→32→3 net trained to copy IK for random
-          pick points above the table.
-        </p>
-        <button
-          onClick={() => {
-            useTwin.getState().log("Training pick policy…");
-            const { net: trained, losses: ls } = trainPolicy();
-            useTwin.getState().setNet(trained, ls);
-            useTwin.getState().log(`Trained. Final loss ${ls[ls.length - 1]?.toFixed(4)}`);
-          }}
-        >
-          Train pick policy
-        </button>
-        {lastLoss !== null && (
-          <p className="metric">
-            loss {lastLoss.toFixed(4)} · {losses.length} checkpoints
-            {net ? " · ready" : ""}
-          </p>
-        )}
+        <h2>3. Train (headless MuJoCo)</h2>
+        <label className="field">
+          <span>Episodes</span>
+          <input
+            type="number"
+            min={2}
+            max={20000}
+            value={episodesTarget}
+            onChange={(e) => useTwin.getState().setEpisodesTarget(Number(e.target.value) || 200)}
+          />
+        </label>
         <div className="row">
           <button
-            className={brain === "expert" ? "on" : ""}
-            onClick={() => useTwin.getState().setBrain("expert")}
-          >
-            Expert IK
-          </button>
-          <button
-            className={brain === "learned" ? "on" : ""}
-            disabled={!net}
-            onClick={() => useTwin.getState().setBrain("learned")}
-          >
-            Learned
-          </button>
-        </div>
-        <div className="row">
-          <button
+            className="primary"
+            disabled={!rlOnline || running}
             onClick={() => {
-              useTwin.getState().scatterCup();
-              useTwin.getState().log("Moved the cup to a new spot");
+              void (async () => {
+                const s = useTwin.getState();
+                try {
+                  const out = (await rl.start(s.episodesTarget)) as { run_id: string };
+                  s.setRunId(out.run_id);
+                  s.setVideoUrl(null);
+                  s.log(`Training ${out.run_id}`);
+                } catch (e) {
+                  s.log(e instanceof Error ? e.message : "start failed");
+                }
+              })();
             }}
           >
-            New cup spot
+            Train
           </button>
-          <button className="primary" disabled={pickBusy} onClick={() => queuePick()}>
-            Pick it up
+          <button
+            disabled={!rlOnline || !running}
+            onClick={() => {
+              void rl.stop().then(() => useTwin.getState().log("Stop requested"));
+            }}
+          >
+            Stop
           </button>
+          <button
+            disabled={!rlOnline || running || !runId}
+            onClick={() => {
+              void (async () => {
+                const s = useTwin.getState();
+                try {
+                  await rl.start(s.episodesTarget, true);
+                  s.log("Resuming from last checkpoint");
+                } catch (e) {
+                  s.log(e instanceof Error ? e.message : "resume failed");
+                }
+              })();
+            }}
+          >
+            Resume
+          </button>
+        </div>
+        {status && (
+          <p className="metric">
+            {status.run_id ?? "—"} · {status.state} · ep {status.episode}/{status.episodes_target} ·
+            success {(status.success_rate * 100).toFixed(0)}% · R {status.reward.toFixed(2)}
+          </p>
+        )}
+        <RateChart points={metrics} />
+        <pre className="logtail">{(status?.log_tail ?? []).slice(-12).join("\n") || " "}</pre>
+      </section>
+
+      <section>
+        <h2>4. Episodes</h2>
+        <p className="hint">Training stays headless. Click render, wait, then watch the mp4.</p>
+        {videoUrl && (
+          <button onClick={() => useTwin.getState().setVideoUrl(null)}>Show photo twin</button>
+        )}
+        <div className="eps">
+          {episodes.length === 0 && <p className="hint">No episodes yet.</p>}
+          {episodes
+            .slice()
+            .reverse()
+            .slice(0, 80)
+            .map((e) => (
+              <div className="ep" key={e.index}>
+                <span>
+                  #{e.index} {e.success ? "lift" : "miss"} R {e.reward.toFixed(1)}
+                </span>
+                <button
+                  disabled={!runId || renderBusy !== null}
+                  onClick={() => {
+                    const id = useTwin.getState().runId;
+                    if (!id) return;
+                    useTwin.getState().setRenderBusy(e.index);
+                    useTwin.getState().log(`Rendering episode ${e.index}…`);
+                    void (async () => {
+                      try {
+                        await rl.render(id, e.index);
+                        useTwin.getState().setVideoUrl(rl.videoUrl(id, e.index) + `?t=${Date.now()}`);
+                        useTwin.getState().log(`Episode ${e.index} ready`);
+                      } catch (err) {
+                        useTwin.getState().log(err instanceof Error ? err.message : "render failed");
+                      } finally {
+                        useTwin.getState().setRenderBusy(null);
+                      }
+                    })();
+                  }}
+                >
+                  {renderBusy === e.index ? "rendering…" : e.has_video ? "view mp4" : "render mp4"}
+                </button>
+              </div>
+            ))}
         </div>
       </section>
 

@@ -21,7 +21,7 @@ except ImportError as e:
     raise SystemExit("pip install torch") from e
 
 L1, L2 = 0.36, 0.32
-BASE = ( -0.62, 0.04, 0.0 )
+BASE = (-0.62, 0.12, 0.0)
 
 
 def ik(x: float, y: float, z: float) -> tuple[float, float, float]:

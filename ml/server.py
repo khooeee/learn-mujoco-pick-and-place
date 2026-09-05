@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import os
+import re
 import signal
 import subprocess
 import sys
@@ -11,13 +12,13 @@ import threading
 import time
 from pathlib import Path
 
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, File, Form, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from pydantic import BaseModel
 
 from log import read_json, read_jsonl
-from library import list_objects, selected_id, set_selected
+from library import import_glb, list_objects, object_dir, selected_id, set_selected, stl_path
 from mint import api_key, generate_from_prompt, load_dotenv
 from replay import render_episode
 
@@ -230,6 +231,35 @@ def latest_eval(run_id: str):
 @app.get("/objects")
 def objects():
     return {"selected": selected_id(), "items": list_objects()}
+
+
+@app.get("/objects/{oid}/mesh")
+def object_mesh(oid: str):
+    if not re.fullmatch(r"[A-Za-z0-9._-]+", oid):
+        raise HTTPException(400, "bad id")
+    path = stl_path(oid)
+    if not path.exists() or not path.is_file():
+        raise HTTPException(404, "no mesh")
+    if path.resolve().parent != object_dir(oid).resolve():
+        raise HTTPException(400, "bad id")
+    return FileResponse(path, media_type="model/stl", filename="object.stl")
+
+
+@app.post("/objects/import")
+async def objects_import(file: UploadFile = File(...), name: str | None = Form(None)):
+    fname = file.filename or "object.glb"
+    if not fname.lower().endswith(".glb"):
+        raise HTTPException(400, "Upload a .glb file")
+    raw = await file.read()
+    if len(raw) > 80_000_000:
+        raise HTTPException(400, "File too large (80 MB max)")
+    if len(raw) < 20:
+        raise HTTPException(400, "Empty file")
+    label = (name or "").strip() or Path(fname).stem
+    try:
+        return import_glb(raw, label)
+    except RuntimeError as e:
+        raise HTTPException(400, str(e)) from e
 
 
 @app.post("/objects/select")

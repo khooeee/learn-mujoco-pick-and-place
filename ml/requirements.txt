@@ -7,3 +7,4 @@ imageio>=2.36
 imageio-ffmpeg>=0.5
 pillow>=10.0
 trimesh>=4.4
+python-multipart>=0.0.9

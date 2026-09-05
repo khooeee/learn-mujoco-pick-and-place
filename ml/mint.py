@@ -7,10 +7,9 @@ import os
 import time
 import urllib.error
 import urllib.request
-from io import BytesIO
 from pathlib import Path
 
-from library import TARGET_EXTENT, object_dir, save_object
+from library import object_dir, rescale_glb, save_object
 
 ROOT = Path(__file__).resolve().parent
 API = "https://api.mint.gg/v1"
@@ -108,39 +107,6 @@ def _glb_url(model: dict) -> str:
     raise RuntimeError("Mint model has no GLB url")
 
 
-def _rescale_glb(glb: bytes) -> tuple[bytes, dict]:
-    import trimesh
-
-    loaded = trimesh.load(BytesIO(glb), file_type="glb", force="scene")
-    if isinstance(loaded, trimesh.Scene):
-        geoms = [g for g in loaded.geometry.values() if isinstance(g, trimesh.Trimesh)]
-        if not geoms:
-            raise RuntimeError("Mint GLB had no mesh")
-        mesh = trimesh.util.concatenate(geoms)
-    elif isinstance(loaded, trimesh.Trimesh):
-        mesh = loaded
-    else:
-        raise RuntimeError("Could not read Mint GLB")
-    extent = float(mesh.extents.max())
-    if extent <= 1e-6:
-        raise RuntimeError("Mesh has zero size")
-    scale = TARGET_EXTENT / extent
-    mesh.apply_scale(scale)
-    mesh.apply_translation(-mesh.bounds[0])
-    ex, ey, ez = (float(v) for v in mesh.extents)
-    stl = mesh.export(file_type="stl")
-    if isinstance(stl, str):
-        stl = stl.encode()
-    return bytes(stl), {
-        "scale": scale,
-        "source_extent": extent,
-        "w": max(ex, ey),
-        "h": ez,
-        "d": min(ex, ey),
-        "target_extent": TARGET_EXTENT,
-    }
-
-
 def generate_from_prompt(prompt: str) -> dict:
     prompt = prompt.strip()
     if not prompt:
@@ -159,7 +125,7 @@ def generate_from_prompt(prompt: str) -> dict:
     req = urllib.request.Request(url)
     with urllib.request.urlopen(req, timeout=120) as res:
         glb = res.read()
-    stl, dims = _rescale_glb(glb)
-    dest = save_object(prompt, stl, {"mint_model_id": str(model_id), **dims})
+    stl, dims = rescale_glb(glb)
+    dest = save_object(prompt, stl, {"mint_model_id": str(model_id), "source": "mint", **dims})
     (object_dir(dest["id"]) / "source.glb").write_bytes(glb)
     return dest

@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useRef, useState } from "react";
 import { rl } from "../lib/rlApi";
 import { useTwin } from "../store";
 
@@ -36,6 +36,9 @@ export function Panel() {
   const mintConfigured = useTwin((s) => s.mintConfigured);
   const objects = useTwin((s) => s.objects);
   const selectedId = useTwin((s) => s.selectedId);
+  const previewId = useTwin((s) => s.previewId);
+  const glbInput = useRef<HTMLInputElement>(null);
+  const [importBusy, setImportBusy] = useState(false);
 
   useEffect(() => {
     let stop = false;
@@ -91,8 +94,8 @@ export function Panel() {
       <section>
         <h2>1. Object</h2>
         <p className="hint">
-          Mint builds a mesh from a prompt, then we rescale it to 7 cm and save it.
-          Use any saved object; the next episode picks it up. Primitives = random
+          Mint or import a GLB. Either way we rescale to 7 cm and save it. Use
+          any saved object; the next episode picks it up. Primitives = random
           boxes and cylinders.
         </p>
         <label className="field">
@@ -146,6 +149,41 @@ export function Panel() {
             Primitives
           </button>
         </div>
+        <label className="field">
+          <span>Import GLB</span>
+          <input ref={glbInput} type="file" accept=".glb,model/gltf-binary" />
+        </label>
+        <div className="row">
+          <button
+            disabled={!rlOnline || importBusy || mintBusy}
+            onClick={() => {
+              const file = glbInput.current?.files?.[0];
+              if (!file) {
+                useTwin.getState().log("Choose a .glb file first");
+                return;
+              }
+              void (async () => {
+                const s = useTwin.getState();
+                setImportBusy(true);
+                s.log(`Importing ${file.name}…`);
+                try {
+                  const meta = await rl.importGlb(file, file.name.replace(/\.glb$/i, ""));
+                  const lib = await rl.objects();
+                  s.setObjects(lib.items, lib.selected);
+                  s.setPreview(meta.id, meta.prompt);
+                  s.log(`Imported ${meta.prompt} (${(meta.w ?? 0).toFixed(3)} × ${(meta.h ?? 0).toFixed(3)} m)`);
+                  if (glbInput.current) glbInput.current.value = "";
+                } catch (e) {
+                  s.log(e instanceof Error ? e.message : "import failed");
+                } finally {
+                  setImportBusy(false);
+                }
+              })();
+            }}
+          >
+            {importBusy ? "Importing…" : "Import"}
+          </button>
+        </div>
         <div className="olist">
           {(objects ?? []).length === 0 && <p className="hint">No saved objects yet.</p>}
           {(objects ?? []).map((o) => (
@@ -156,24 +194,36 @@ export function Panel() {
                   {(o.w ?? 0).toFixed(3)} × {(o.h ?? 0).toFixed(3)} m · {o.created ?? o.id}
                 </p>
               </span>
-              <button
-                className={o.id === selectedId ? "on" : ""}
-                disabled={!rlOnline}
-                onClick={() => {
-                  void (async () => {
-                    const s = useTwin.getState();
-                    try {
-                      const lib = await rl.selectObject(o.id);
-                      s.setObjects(lib.items, lib.selected);
-                      s.log(`Using ${o.prompt}`);
-                    } catch (e) {
-                      s.log(e instanceof Error ? e.message : "select failed");
-                    }
-                  })();
-                }}
-              >
-                {o.id === selectedId ? "selected" : "use"}
-              </button>
+              <div className="ob-actions">
+                <button
+                  className={previewId === o.id ? "on" : ""}
+                  disabled={!rlOnline}
+                  onClick={() => {
+                    useTwin.getState().setPreview(o.id, o.prompt);
+                    useTwin.getState().log(`Showing ${o.prompt}`);
+                  }}
+                >
+                  {previewId === o.id ? "showing" : "display"}
+                </button>
+                <button
+                  className={o.id === selectedId ? "on" : ""}
+                  disabled={!rlOnline}
+                  onClick={() => {
+                    void (async () => {
+                      const s = useTwin.getState();
+                      try {
+                        const lib = await rl.selectObject(o.id);
+                        s.setObjects(lib.items, lib.selected);
+                        s.log(`Using ${o.prompt}`);
+                      } catch (e) {
+                        s.log(e instanceof Error ? e.message : "select failed");
+                      }
+                    })();
+                  }}
+                >
+                  {o.id === selectedId ? "selected" : "use"}
+                </button>
+              </div>
             </div>
           ))}
         </div>

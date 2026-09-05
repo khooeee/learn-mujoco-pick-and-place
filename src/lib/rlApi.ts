@@ -70,6 +70,12 @@ export const rl = {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ prompt }),
     }) as Promise<MintObject>,
+  importGlb: (file: File, name?: string) => {
+    const body = new FormData();
+    body.append("file", file);
+    if (name) body.append("name", name);
+    return req("/objects/import", { method: "POST", body }) as Promise<MintObject>;
+  },
   status: (): Promise<TrainStatus> => req("/status"),
   start: (episodes: number, resume = false) =>
     req("/train/start", {
@@ -89,4 +95,5 @@ export const rl = {
       body: JSON.stringify({ run_id: runId, episode }),
     }),
   videoUrl: (runId: string, episode: number) => `${PREFIX}/runs/${runId}/videos/${episode}`,
+  objectMeshUrl: (id: string) => `${PREFIX}/objects/${encodeURIComponent(id)}/mesh`,
 };

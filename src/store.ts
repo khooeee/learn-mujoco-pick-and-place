@@ -18,6 +18,8 @@ type Store = {
   mintConfigured: boolean;
   objects: MintObject[];
   selectedId: string | null;
+  previewId: string | null;
+  previewPrompt: string | null;
   log: (text: string) => void;
   setRlOnline: (v: boolean) => void;
   setStatus: (s: TrainStatus | null) => void;
@@ -31,6 +33,7 @@ type Store = {
   setMintBusy: (v: boolean) => void;
   setMintConfigured: (v: boolean) => void;
   setObjects: (items: MintObject[], selected: string | null) => void;
+  setPreview: (id: string | null, prompt?: string | null) => void;
 };
 
 export const useTwin = create<Store>((set) => ({
@@ -48,6 +51,8 @@ export const useTwin = create<Store>((set) => ({
   mintConfigured: false,
   objects: [],
   selectedId: null,
+  previewId: null,
+  previewPrompt: null,
   log: (text) =>
     set((s) => ({
       logs: [{ t: Date.now(), text }, ...s.logs].slice(0, 24),
@@ -57,11 +62,18 @@ export const useTwin = create<Store>((set) => ({
   setRunId: (runId) => set({ runId }),
   setEpisodes: (episodes) => set({ episodes }),
   setMetrics: (metrics) => set({ metrics }),
-  setVideoUrl: (videoUrl) => set({ videoUrl }),
+  setVideoUrl: (videoUrl) =>
+    set(videoUrl ? { videoUrl, previewId: null, previewPrompt: null } : { videoUrl }),
   setRenderBusy: (renderBusy) => set({ renderBusy }),
   setEpisodesTarget: (episodesTarget) => set({ episodesTarget }),
   setMintPrompt: (mintPrompt) => set({ mintPrompt }),
   setMintBusy: (mintBusy) => set({ mintBusy }),
   setMintConfigured: (mintConfigured) => set({ mintConfigured }),
   setObjects: (objects, selectedId) => set({ objects: objects ?? [], selectedId }),
+  setPreview: (previewId, previewPrompt = null) =>
+    set(
+      previewId
+        ? { previewId, previewPrompt: previewPrompt ?? null, videoUrl: null }
+        : { previewId: null, previewPrompt: null },
+    ),
 }));

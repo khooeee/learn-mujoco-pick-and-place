@@ -1,9 +1,16 @@
+import { ObjectPreview } from "./ObjectPreview";
 import { useTwin } from "../store";
 
 export function Sim() {
   const videoUrl = useTwin((s) => s.videoUrl);
+  const previewId = useTwin((s) => s.previewId);
+  const previewPrompt = useTwin((s) => s.previewPrompt);
   const status = useTwin((s) => s.status);
   const running = status?.state === "running" || status?.alive;
+
+  if (previewId) {
+    return <ObjectPreview id={previewId} prompt={previewPrompt || previewId} />;
+  }
 
   return (
     <div className="stage-inner">
@@ -16,7 +23,7 @@ export function Sim() {
           <p>
             {running
               ? "Training is headless. Render an episode from the list when you want to watch."
-              : "Pick an object (or primitives), train, then render an episode mp4."}
+              : "Display an object, train, then render an episode mp4."}
           </p>
         </div>
       )}

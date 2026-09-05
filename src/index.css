@@ -91,6 +91,7 @@ body,
 }
 
 .field input[type="number"],
+.field input[type="file"],
 .field textarea {
   background: #120f0c;
   color: #f3ece4;
@@ -105,6 +106,45 @@ body,
   max-height: 180px;
   overflow: auto;
   margin: 8px 0 0;
+}
+
+.ob-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  flex-shrink: 0;
+}
+
+.ob-actions button {
+  min-width: 76px;
+  padding: 6px 8px;
+  font-size: 12px;
+}
+
+.preview {
+  position: relative;
+}
+
+.preview-bar {
+  position: absolute;
+  left: 16px;
+  right: 16px;
+  bottom: 16px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  color: #c9b8a6;
+  font-size: 13px;
+  pointer-events: none;
+}
+
+.preview-bar p {
+  margin: 0;
+}
+
+.preview-bar button {
+  pointer-events: auto;
 }
 
 .ob {

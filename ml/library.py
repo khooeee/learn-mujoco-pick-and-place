@@ -30,7 +30,9 @@ def list_objects() -> list[dict]:
     for p in sorted(OBJECTS.iterdir(), key=lambda x: x.stat().st_mtime, reverse=True):
         meta = p / "meta.json"
         if p.is_dir() and meta.exists():
-            rows.append(json.loads(meta.read_text()))
+            row = json.loads(meta.read_text())
+            row["has_glb"] = (p / "source.glb").exists()
+            rows.append(row)
     return rows
 
 
@@ -63,6 +65,10 @@ def load_meta(oid: str) -> dict:
 
 def stl_path(oid: str) -> Path:
     return object_dir(oid) / "object.stl"
+
+
+def glb_path(oid: str) -> Path:
+    return object_dir(oid) / "source.glb"
 
 
 def save_object(prompt: str, stl_bytes: bytes, extra: dict) -> dict:

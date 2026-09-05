@@ -20,6 +20,8 @@ export type MintObject = {
   created?: string;
   w?: number;
   h?: number;
+  scale?: number;
+  has_glb?: boolean;
 };
 
 export type EpisodeRow = {
@@ -96,4 +98,5 @@ export const rl = {
     }),
   videoUrl: (runId: string, episode: number) => `${PREFIX}/runs/${runId}/videos/${episode}`,
   objectMeshUrl: (id: string) => `${PREFIX}/objects/${encodeURIComponent(id)}/mesh`,
+  objectGlbUrl: (id: string) => `${PREFIX}/objects/${encodeURIComponent(id)}/source.glb`,
 };

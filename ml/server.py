@@ -18,7 +18,7 @@ from fastapi.responses import FileResponse
 from pydantic import BaseModel
 
 from log import read_json, read_jsonl
-from library import import_glb, list_objects, object_dir, selected_id, set_selected, stl_path
+from library import glb_path, import_glb, list_objects, object_dir, selected_id, set_selected, stl_path
 from mint import api_key, generate_from_prompt, load_dotenv
 from replay import render_episode
 
@@ -243,6 +243,18 @@ def object_mesh(oid: str):
     if path.resolve().parent != object_dir(oid).resolve():
         raise HTTPException(400, "bad id")
     return FileResponse(path, media_type="model/stl", filename="object.stl")
+
+
+@app.get("/objects/{oid}/source.glb")
+def object_glb(oid: str):
+    if not re.fullmatch(r"[A-Za-z0-9._-]+", oid):
+        raise HTTPException(400, "bad id")
+    path = glb_path(oid)
+    if not path.exists() or not path.is_file():
+        raise HTTPException(404, "no glb")
+    if path.resolve().parent != object_dir(oid).resolve():
+        raise HTTPException(400, "bad id")
+    return FileResponse(path, media_type="model/gltf-binary", filename="source.glb")
 
 
 @app.post("/objects/import")

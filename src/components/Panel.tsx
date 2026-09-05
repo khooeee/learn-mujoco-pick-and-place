@@ -220,7 +220,7 @@ export function Panel() {
             min={2}
             max={20000}
             value={episodesTarget}
-            onChange={(e) => useTwin.getState().setEpisodesTarget(Number(e.target.value) || 200)}
+            onChange={(e) => useTwin.getState().setEpisodesTarget(Number(e.target.value) || 1000)}
           />
         </label>
         <div className="row">

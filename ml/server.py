@@ -43,7 +43,7 @@ _mint_busy = False
 
 
 class TrainReq(BaseModel):
-    episodes: int = 200
+    episodes: int = 1000
     seed: int = 0
     resume: bool = False
 

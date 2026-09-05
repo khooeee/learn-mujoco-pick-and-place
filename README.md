@@ -27,7 +27,7 @@ CLI instead of the UI:
 
 ```bash
 cd ml
-.venv/bin/python train_rl.py --run demo --episodes 200
+.venv/bin/python train_rl.py --run demo --episodes 1000
 .venv/bin/python replay.py --run demo --episode 12 --mp4
 .venv/bin/python replay.py --run demo --episode 12 --view
 ```

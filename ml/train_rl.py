@@ -96,7 +96,7 @@ def to_batch(episodes: list[dict], dev: torch.device) -> dict:
 def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("--run", default="")
-    ap.add_argument("--episodes", type=int, default=400)
+    ap.add_argument("--episodes", type=int, default=1000)
     ap.add_argument("--seed", type=int, default=0)
     ap.add_argument("--resume", default="")
     ap.add_argument("--batch-episodes", type=int, default=8)

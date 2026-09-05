@@ -24,6 +24,19 @@ export type MintObject = {
   has_glb?: boolean;
 };
 
+export type RunRow = {
+  id: string;
+  state: string;
+  episode: number;
+  episodes_target: number;
+  success_rate: number;
+  reward: number;
+  episodes: number;
+  videos: number;
+  has_policy: boolean;
+  mtime: number;
+};
+
 export type EpisodeRow = {
   index: number;
   success: boolean;
@@ -86,7 +99,9 @@ export const rl = {
       body: JSON.stringify({ episodes, resume }),
     }),
   stop: () => req("/train/stop", { method: "POST" }),
-  runs: () => req("/runs") as Promise<{ id: string }[]>,
+  runs: () => req("/runs") as Promise<RunRow[]>,
+  openRun: (runId: string) =>
+    req(`/runs/${encodeURIComponent(runId)}/open`, { method: "POST" }),
   episodes: (runId: string): Promise<EpisodeRow[]> => req(`/runs/${runId}/episodes`),
   metrics: (runId: string): Promise<{ episode: number; rate: number; reward: number }[]> =>
     req(`/runs/${runId}/metrics`),

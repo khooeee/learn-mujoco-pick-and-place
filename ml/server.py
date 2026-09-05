@@ -193,10 +193,40 @@ def runs():
         return []
     out = []
     for p in sorted(RUNS.iterdir(), key=lambda x: x.stat().st_mtime, reverse=True):
-        if p.is_dir():
-            st = read_json(p / "status.json") if (p / "status.json").exists() else {}
-            out.append({"id": p.name, **st})
+        if not p.is_dir():
+            continue
+        st = read_json(p / "status.json") if (p / "status.json").exists() else {}
+        eps_path = p / "episodes.jsonl"
+        n_eps = 0
+        if eps_path.exists():
+            n_eps = sum(1 for line in eps_path.read_text().splitlines() if line.strip())
+        vid_dir = p / "videos"
+        n_vid = len(list(vid_dir.glob("ep_*.mp4"))) if vid_dir.exists() else 0
+        out.append(
+            {
+                "id": p.name,
+                "state": st.get("state") or "idle",
+                "episode": int(st.get("episode") or n_eps),
+                "episodes_target": int(st.get("episodes_target") or 0),
+                "success_rate": float(st.get("success_rate") or 0.0),
+                "reward": float(st.get("reward") or 0.0),
+                "episodes": n_eps,
+                "videos": n_vid,
+                "has_policy": (p / "policy.pt").exists(),
+                "mtime": p.stat().st_mtime,
+            }
+        )
     return out
+
+
+@app.post("/runs/{run_id}/open")
+def open_run_folder(run_id: str):
+    run_dir = _safe_run(run_id)
+    try:
+        _reveal(run_dir)
+    except OSError as e:
+        raise HTTPException(500, f"could not open folder: {e}") from e
+    return {"path": str(run_dir)}
 
 
 @app.get("/runs/{run_id}/episodes")

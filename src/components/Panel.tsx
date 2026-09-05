@@ -36,6 +36,7 @@ export function Panel() {
   const objects = useTwin((s) => s.objects);
   const selectedId = useTwin((s) => s.selectedId);
   const previewId = useTwin((s) => s.previewId);
+  const runs = useTwin((s) => s.runs);
   const glbInput = useRef<HTMLInputElement>(null);
   const [importBusy, setImportBusy] = useState(false);
 
@@ -49,12 +50,13 @@ export function Panel() {
         s.setRlOnline(Boolean(health));
         if (!health) return;
         s.setMintConfigured(Boolean(health.mint));
-        const [st, objs] = await Promise.all([rl.status(), rl.objects()]);
+        const [st, objs, runList] = await Promise.all([rl.status(), rl.objects(), rl.runs()]);
         if (stop) return;
         s.setObjects(objs.items, objs.selected);
         s.setStatus(st);
-        if (st.run_id) s.setRunId(st.run_id);
-        const id = st.run_id || s.runId;
+        s.setRuns(runList);
+        if (s.followLive && st.run_id) s.setRunId(st.run_id);
+        const id = useTwin.getState().runId;
         if (id) {
           const [eps, met] = await Promise.all([rl.episodes(id), rl.metrics(id)]);
           if (stop) return;
@@ -277,10 +279,72 @@ export function Panel() {
       </section>
 
       <section>
-        <h2>3. Episodes</h2>
+        <h2>3. Runs</h2>
+        <p className="hint">All training runs. Open one to load its episodes below.</p>
+        <div className="runs-wrap">
+          {(runs ?? []).length === 0 && <p className="hint">No runs yet.</p>}
+          {(runs ?? []).length > 0 && (
+            <table className="runs">
+              <thead>
+                <tr>
+                  <th>Run</th>
+                  <th>State</th>
+                  <th>Ep</th>
+                  <th>Success</th>
+                  <th>Videos</th>
+                  <th>Ckpt</th>
+                  <th></th>
+                </tr>
+              </thead>
+              <tbody>
+                {runs.map((r) => (
+                  <tr
+                    key={r.id}
+                    className={r.id === runId ? "on" : ""}
+                    onClick={() => {
+                      const s = useTwin.getState();
+                      s.selectRun(r.id);
+                      s.log(`Viewing ${r.id}`);
+                      void Promise.all([rl.episodes(r.id), rl.metrics(r.id)]).then(([eps, met]) => {
+                        s.setEpisodes(eps);
+                        s.setMetrics(met);
+                      });
+                    }}
+                  >
+                    <td className="run-id">{r.id}</td>
+                    <td>{r.state}</td>
+                    <td>
+                      {r.episodes}
+                      {r.episodes_target ? `/${r.episodes_target}` : ""}
+                    </td>
+                    <td>{(r.success_rate * 100).toFixed(0)}%</td>
+                    <td>{r.videos}</td>
+                    <td>{r.has_policy ? "yes" : "—"}</td>
+                    <td>
+                      <button
+                        disabled={!rlOnline}
+                        onClick={(ev) => {
+                          ev.stopPropagation();
+                          void rl.openRun(r.id).catch((e) => {
+                            useTwin.getState().log(e instanceof Error ? e.message : "open failed");
+                          });
+                        }}
+                      >
+                        folder
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+        </div>
+      </section>
+
+      <section>
+        <h2>4. Episodes</h2>
         <p className="hint">
-          Training stays headless. Render an mp4, or open the run folder (selects
-          the video in Finder when it exists).
+          Episodes for the selected run. Render an mp4, or open the folder in Finder.
         </p>
         {videoUrl && (
           <button onClick={() => useTwin.getState().setVideoUrl(null)}>Clear video</button>

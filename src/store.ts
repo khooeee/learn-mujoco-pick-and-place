@@ -1,5 +1,5 @@
 import { create } from "zustand";
-import type { EpisodeRow, MintObject, TrainStatus } from "./lib/rlApi";
+import type { EpisodeRow, MintObject, RunRow, TrainStatus } from "./lib/rlApi";
 
 type Store = {
   rlOnline: boolean;
@@ -17,6 +17,8 @@ type Store = {
   selectedId: string | null;
   previewId: string | null;
   previewPrompt: string | null;
+  runs: RunRow[];
+  followLive: boolean;
   log: (text: string) => void;
   setRlOnline: (v: boolean) => void;
   setStatus: (s: TrainStatus | null) => void;
@@ -31,6 +33,8 @@ type Store = {
   setMintConfigured: (v: boolean) => void;
   setObjects: (items: MintObject[], selected: string | null) => void;
   setPreview: (id: string | null, prompt?: string | null) => void;
+  setRuns: (runs: RunRow[]) => void;
+  selectRun: (id: string, followLive?: boolean) => void;
 };
 
 export const useTwin = create<Store>((set) => ({
@@ -49,12 +53,14 @@ export const useTwin = create<Store>((set) => ({
   selectedId: null,
   previewId: null,
   previewPrompt: null,
+  runs: [],
+  followLive: true,
   log: (text) => {
     console.log(text);
   },
   setRlOnline: (rlOnline) => set({ rlOnline }),
   setStatus: (status) => set({ status }),
-  setRunId: (runId) => set({ runId }),
+  setRunId: (runId) => set({ runId, followLive: true }),
   setEpisodes: (episodes) => set({ episodes }),
   setMetrics: (metrics) => set({ metrics }),
   setVideoUrl: (videoUrl) =>
@@ -71,4 +77,6 @@ export const useTwin = create<Store>((set) => ({
         ? { previewId, previewPrompt: previewPrompt ?? null, videoUrl: null }
         : { previewId: null, previewPrompt: null },
     ),
+  setRuns: (runs) => set({ runs }),
+  selectRun: (runId, followLive = false) => set({ runId, followLive, videoUrl: null }),
 }));

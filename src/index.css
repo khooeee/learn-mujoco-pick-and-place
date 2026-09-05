@@ -75,9 +75,57 @@ body,
   white-space: pre-wrap;
 }
 
-.eps {
-  max-height: 240px;
+.runs-wrap {
+  max-height: 220px;
   overflow: auto;
+  margin-top: 8px;
+}
+
+.runs {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 11px;
+}
+
+.runs th,
+.runs td {
+  text-align: left;
+  padding: 6px 4px;
+  border-bottom: 1px solid #2a241e;
+  vertical-align: middle;
+}
+
+.runs th {
+  color: #9a8b7c;
+  font-weight: 550;
+  position: sticky;
+  top: 0;
+  background: #1a1612;
+}
+
+.runs tbody tr {
+  cursor: pointer;
+}
+
+.runs tbody tr.on td {
+  color: #ffd3b0;
+}
+
+.runs tbody tr:hover td {
+  background: #221c18;
+}
+
+.runs .run-id {
+  font-variant-numeric: tabular-nums;
+  max-width: 9.5rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.runs td button {
+  padding: 4px 6px;
+  font-size: 11px;
 }
 
 .ep {

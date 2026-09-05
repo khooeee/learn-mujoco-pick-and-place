@@ -38,6 +38,7 @@ export function Panel() {
   const selectedId = useTwin((s) => s.selectedId);
   const previewId = useTwin((s) => s.previewId);
   const runs = useTwin((s) => s.runs);
+  const selectedRun = runs.find((r) => r.id === runId);
   const glbInput = useRef<HTMLInputElement>(null);
   const [importBusy, setImportBusy] = useState(false);
 
@@ -239,75 +240,8 @@ export function Panel() {
       </section>
 
       <section>
-        <h2>2. Train (headless MuJoCo)</h2>
-        <label className="field">
-          <span>Episodes</span>
-          <input
-            type="number"
-            min={2}
-            max={20000}
-            value={episodesTarget}
-            onChange={(e) => useTwin.getState().setEpisodesTarget(Number(e.target.value) || 1000)}
-          />
-        </label>
-        <div className="row">
-          <button
-            className="primary"
-            disabled={!rlOnline || running || !runId}
-            onClick={() => {
-              void (async () => {
-                const s = useTwin.getState();
-                try {
-                  await rl.start(s.episodesTarget, true);
-                  s.log("Resuming from last checkpoint");
-                } catch (e) {
-                  s.log(e instanceof Error ? e.message : "resume failed");
-                }
-              })();
-            }}
-          >
-            Resume
-          </button>
-          <button
-            disabled={!rlOnline || !running}
-            onClick={() => {
-              void rl.stop().then(() => useTwin.getState().log("Stop requested"));
-            }}
-          >
-            Stop
-          </button>
-          <button
-            disabled={!rlOnline || running || (objects ?? []).length === 0}
-            onClick={() => {
-              void (async () => {
-                const s = useTwin.getState();
-                try {
-                  const out = (await rl.start(s.episodesTarget)) as { run_id: string };
-                  s.setRunId(out.run_id);
-                  s.setVideoUrl(null);
-                  s.log(`Training ${out.run_id}`);
-                } catch (e) {
-                  s.log(e instanceof Error ? e.message : "start failed");
-                }
-              })();
-            }}
-          >
-            Train New
-          </button>
-        </div>
-        {status && (
-          <p className="metric">
-            {status.run_id ?? "—"} · {status.state} · ep {status.episode}/{status.episodes_target} ·
-            success {(status.success_rate * 100).toFixed(0)}% · R {status.reward.toFixed(2)}
-          </p>
-        )}
-        <RateChart points={metrics} />
-        <pre className="logtail">{(status?.log_tail ?? []).slice(-12).join("\n") || " "}</pre>
-      </section>
-
-      <section>
-        <h2>3. Runs</h2>
-        <p className="hint">All training runs. Open one to load its episodes below.</p>
+        <h2>2. Runs</h2>
+        <p className="hint">Click a run to load its episodes. Resume continues the highlighted run.</p>
         <div className="runs-wrap">
           {(runs ?? []).length === 0 && <p className="hint">No runs yet.</p>}
           {(runs ?? []).length > 0 && (
@@ -366,6 +300,79 @@ export function Panel() {
             </table>
           )}
         </div>
+      </section>
+
+      <section>
+        <h2>3. Train (headless MuJoCo)</h2>
+        <label className="field">
+          <span>Episodes</span>
+          <input
+            type="number"
+            min={2}
+            max={20000}
+            value={episodesTarget}
+            onChange={(e) => useTwin.getState().setEpisodesTarget(Number(e.target.value) || 1000)}
+          />
+        </label>
+        <div className="row">
+          <button
+            className="primary"
+            disabled={!rlOnline || running || !runId || selectedRun?.has_policy === false}
+            onClick={() => {
+              void (async () => {
+                const s = useTwin.getState();
+                const id = s.runId;
+                if (!id) {
+                  s.log("Click a run first");
+                  return;
+                }
+                try {
+                  const out = (await rl.start(s.episodesTarget, true, id)) as { run_id: string };
+                  s.setRunId(out.run_id);
+                  s.log(`Resuming ${out.run_id}`);
+                } catch (e) {
+                  s.log(e instanceof Error ? e.message : "resume failed");
+                }
+              })();
+            }}
+          >
+            Resume
+          </button>
+          <button
+            disabled={!rlOnline || !running}
+            onClick={() => {
+              void rl.stop().then(() => useTwin.getState().log("Stop requested"));
+            }}
+          >
+            Stop
+          </button>
+          <button
+            disabled={!rlOnline || running || (objects ?? []).length === 0}
+            onClick={() => {
+              void (async () => {
+                const s = useTwin.getState();
+                try {
+                  const out = (await rl.start(s.episodesTarget)) as { run_id: string };
+                  s.setRunId(out.run_id);
+                  s.setVideoUrl(null);
+                  s.log(`Training ${out.run_id}`);
+                } catch (e) {
+                  s.log(e instanceof Error ? e.message : "start failed");
+                }
+              })();
+            }}
+          >
+            Train New
+          </button>
+        </div>
+        {status && (
+          <p className="metric">
+            {status.run_id ?? "—"} · {status.state} · ep {status.episode}/{status.episodes_target} ·
+            success {(status.success_rate * 100).toFixed(0)}% · R {status.reward.toFixed(2)}
+          </p>
+        )}
+        <RateChart points={metrics} />
+        <pre className="logtail">{(status?.log_tail ?? []).slice(-12).join("\n") || " "}</pre>
       </section>
 
       <section>

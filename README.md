@@ -20,7 +20,7 @@ npm run dev         # UI on :5173
 Open http://localhost:5173
 
 1. **Object** — Mint a mesh, or import a `.glb`. Both are rescaled to ~7 cm and saved in `ml/assets/objects/`. Pick a saved object for training.
-2. **Train** — headless PPO on MPS. Watch episode / success rate / log. Changing the selected object applies on the next episode.
+2. **Runs** — click a row, then **Resume** to continue that checkpoint. **Train New** starts a fresh folder.
 3. **Episodes → render mp4** — waits, then plays in the stage (overhead | wrist). Replay uses the GLB albedo on the object when a texture exists.
 
 CLI instead of the UI:

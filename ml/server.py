@@ -47,6 +47,7 @@ class TrainReq(BaseModel):
     episodes: int = 1000
     seed: int = 0
     resume: bool = False
+    run_id: str | None = None
 
 
 class MintReq(BaseModel):
@@ -162,10 +163,22 @@ def train_start(req: TrainReq):
     if not list_objects():
         raise HTTPException(400, "Import or generate an object first")
     _log = []
+    episodes = req.episodes
     if req.resume:
-        latest = _latest_run()
-        run_id = _run_id or (latest.name if latest else time.strftime("run-%Y%m%d-%H%M%S"))
-        resume = str(RUNS / run_id / "policy.pt")
+        if not req.run_id:
+            raise HTTPException(400, "Select a run to resume")
+        run_dir = _safe_run(req.run_id)
+        run_id = run_dir.name
+        ckpt = run_dir / "policy.pt"
+        if not ckpt.exists():
+            raise HTTPException(400, f"{run_id} has no checkpoint")
+        resume = str(ckpt)
+        status_path = run_dir / "status.json"
+        current = 0
+        if status_path.exists():
+            current = int(read_json(status_path).get("episode", 0) or 0)
+        if current >= episodes:
+            episodes = current + req.episodes
     else:
         run_id = time.strftime("run-%Y%m%d-%H%M%S")
         resume = ""
@@ -180,7 +193,7 @@ def train_start(req: TrainReq):
         "--run",
         run_id,
         "--episodes",
-        str(req.episodes),
+        str(episodes),
         "--seed",
         str(req.seed),
     ]

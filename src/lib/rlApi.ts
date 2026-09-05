@@ -99,11 +99,15 @@ export const rl = {
     return req("/objects/import", { method: "POST", body }) as Promise<MintObject>;
   },
   status: (): Promise<TrainStatus> => req("/status"),
-  start: (episodes: number, resume = false) =>
+  start: (episodes: number, resume = false, runId?: string | null) =>
     req("/train/start", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ episodes, resume }),
+      body: JSON.stringify({
+        episodes,
+        resume,
+        ...(resume && runId ? { run_id: runId } : {}),
+      }),
     }),
   stop: () => req("/train/stop", { method: "POST" }),
   runs: () => req("/runs") as Promise<RunRow[]>,

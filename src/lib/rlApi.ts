@@ -60,7 +60,7 @@ export const rl = {
     const row = raw as { selected?: string | null; items?: MintObject[] };
     return { selected: row.selected ?? null, items: row.items ?? [] };
   },
-  selectObject: (id: string | null) =>
+  selectObject: (id: string) =>
     req("/objects/select", {
       method: "POST",
       headers: { "Content-Type": "application/json" },

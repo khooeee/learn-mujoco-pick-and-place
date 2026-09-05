@@ -9,7 +9,7 @@ import shutil
 import mujoco
 import numpy as np
 
-from library import load_meta, selected_id, stl_path
+from library import load_meta, require_object_id, stl_path
 
 ROOT = Path(__file__).resolve().parent
 SCENE = ROOT / "so101" / "pick_scene.xml"
@@ -110,24 +110,13 @@ class PickEnv:
     def random_spec(self) -> ObjectSpec:
         x = float(0.16 + self.rng.random() * 0.14)
         y = float(-0.10 + self.rng.random() * 0.20)
-        oid = selected_id()
-        if oid:
-            meta = load_meta(oid)
-            h = float(meta.get("h") or 0.06)
-            w = float(meta.get("w") or 0.05)
-            return ObjectSpec(
-                x, y, TABLE_TOP + 0.002, h, w, 2, (0.85, 0.38, 0.16, 1.0), mesh_id=oid
-            )
-        h = float(0.04 + self.rng.random() * 0.05)
-        w = float(0.03 + self.rng.random() * 0.03)
-        shape = int(self.rng.integers(0, 2))
-        rgba = (
-            float(0.4 + self.rng.random() * 0.55),
-            float(0.2 + self.rng.random() * 0.5),
-            float(0.1 + self.rng.random() * 0.4),
-            1.0,
+        oid = require_object_id()
+        meta = load_meta(oid)
+        h = float(meta.get("h") or 0.06)
+        w = float(meta.get("w") or 0.05)
+        return ObjectSpec(
+            x, y, TABLE_TOP + 0.002, h, w, 2, (0.85, 0.38, 0.16, 1.0), mesh_id=oid
         )
-        return ObjectSpec(x, y, TABLE_TOP + h / 2 + 0.002, h, w, shape, rgba)
 
     def reset(self, seed: int | None = None, spec: ObjectSpec | None = None) -> dict:
         if seed is not None:

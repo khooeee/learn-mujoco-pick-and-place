@@ -19,7 +19,7 @@ npm run dev         # UI on :5173
 
 Open http://localhost:5173
 
-1. **Object** — Mint a mesh, or import a `.glb`. Both are rescaled to ~7 cm and saved in `ml/assets/objects/`. Pick any saved object, or use random boxes/cylinders.
+1. **Object** — Mint a mesh, or import a `.glb`. Both are rescaled to ~7 cm and saved in `ml/assets/objects/`. Pick a saved object for training.
 2. **Train** — headless PPO on MPS. Watch episode / success rate / log. Changing the selected object applies on the next episode.
 3. **Episodes → render mp4** — waits, then plays in the stage.
 
@@ -39,7 +39,7 @@ cd ml
 - Critic: those **plus** object pose (training only)
 - Actions: 6 SO-101 actuators, no inverse kinematics
 - Reward: reach object and lift it
-- Objects: Mint prompt or GLB import → local library, or primitive boxes/cylinders. Longest edge is 7 cm on import.
+- Objects: Mint prompt or GLB import → local library. Longest edge is 7 cm on import.
 
 Not SmolVLA / ACT. Not the old browser IK toy arm.
 

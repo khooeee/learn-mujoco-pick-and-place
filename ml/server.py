@@ -53,7 +53,7 @@ class MintReq(BaseModel):
 
 
 class SelectReq(BaseModel):
-    id: str | None
+    id: str
 
 
 class RenderReq(BaseModel):
@@ -126,6 +126,8 @@ def train_start(req: TrainReq):
     global _proc, _run_id, _log
     if _proc and _proc.poll() is None:
         raise HTTPException(409, "training already running")
+    if not list_objects():
+        raise HTTPException(400, "Import or generate an object first")
     _log = []
     if req.resume:
         latest = _latest_run()

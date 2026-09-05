@@ -45,15 +45,22 @@ def selected_id() -> str | None:
         return None
 
 
-def set_selected(oid: str | None) -> None:
+def set_selected(oid: str) -> None:
     OBJECTS.mkdir(parents=True, exist_ok=True)
-    if oid is None:
-        if SELECTED.exists():
-            SELECTED.unlink()
-        return
     if not (object_dir(oid) / "object.stl").exists():
         raise FileNotFoundError(oid)
     SELECTED.write_text(json.dumps({"id": oid}))
+
+
+def require_object_id() -> str:
+    oid = selected_id()
+    if oid and (object_dir(oid) / "object.stl").exists():
+        return oid
+    items = list_objects()
+    if not items:
+        raise RuntimeError("Import or generate an object first")
+    set_selected(items[0]["id"])
+    return items[0]["id"]
 
 
 def load_meta(oid: str) -> dict:

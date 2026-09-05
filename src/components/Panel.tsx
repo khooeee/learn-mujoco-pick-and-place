@@ -95,8 +95,7 @@ export function Panel() {
         <h2>1. Object</h2>
         <p className="hint">
           Mint or import a GLB. Either way we rescale to 7 cm and save it. Use
-          any saved object; the next episode picks it up. Primitives = random
-          boxes and cylinders.
+          any saved object; the next episode picks it up.
         </p>
         <label className="field">
           <span>Prompt</span>
@@ -129,24 +128,6 @@ export function Panel() {
             }}
           >
             {mintBusy ? "Generating…" : "Generate"}
-          </button>
-          <button
-            className={!selectedId ? "on" : ""}
-            disabled={!rlOnline}
-            onClick={() => {
-              void (async () => {
-                const s = useTwin.getState();
-                try {
-                  const lib = await rl.selectObject(null);
-                  s.setObjects(lib.items, lib.selected);
-                  s.log("Using random boxes / cylinders");
-                } catch (e) {
-                  s.log(e instanceof Error ? e.message : "select failed");
-                }
-              })();
-            }}
-          >
-            Primitives
           </button>
         </div>
         <label className="field">
@@ -244,7 +225,7 @@ export function Panel() {
         <div className="row">
           <button
             className="primary"
-            disabled={!rlOnline || running}
+            disabled={!rlOnline || running || (objects ?? []).length === 0}
             onClick={() => {
               void (async () => {
                 const s = useTwin.getState();

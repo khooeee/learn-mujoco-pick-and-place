@@ -343,7 +343,7 @@ export function Panel() {
 
       <section>
         <h2>4. Episodes</h2>
-        <p className="hint">Episodes for the selected run. Render an mp4 to watch it.</p>
+        <p className="hint">Episodes for the selected run. Render an mp4 (overhead | wrist).</p>
         {videoUrl && (
           <button onClick={() => useTwin.getState().setVideoUrl(null)}>Stop video</button>
         )}

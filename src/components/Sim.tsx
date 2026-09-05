@@ -23,7 +23,7 @@ export function Sim() {
           <p>
             {running
               ? "Training is headless. Render an episode from the list when you want to watch."
-              : "Display an object, train, then render an episode mp4."}
+              : "Display an object, train, then render an episode mp4 (overhead + wrist)."}
           </p>
         </div>
       )}

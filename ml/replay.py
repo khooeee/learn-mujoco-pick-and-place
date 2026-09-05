@@ -43,7 +43,12 @@ def render_episode(run_id: str, index: int, video: Path | None, view: bool) -> P
     def grab() -> np.ndarray:
         assert env.renderer is not None
         env.renderer.update_scene(env.data, camera=env.overhead_cam)
-        return env.renderer.render()
+        overhead = env.renderer.render()
+        env.renderer.update_scene(env.data, camera=env._wrist_camera())
+        wrist = env.renderer.render()
+        h = overhead.shape[0]
+        gap = np.zeros((h, 4, 3), dtype=overhead.dtype)
+        return np.concatenate([overhead, gap, wrist], axis=1)
 
     frames.append(grab())
     for a in row["actions"]:

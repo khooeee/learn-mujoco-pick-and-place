@@ -68,6 +68,26 @@ def _latest_run() -> Path | None:
     return max(dirs, key=lambda p: p.stat().st_mtime) if dirs else None
 
 
+def _safe_run(run_id: str) -> Path:
+    if not re.fullmatch(r"[A-Za-z0-9._-]+", run_id):
+        raise HTTPException(400, "bad id")
+    run_dir = (RUNS / run_id).resolve()
+    if run_dir.parent != RUNS.resolve() or not run_dir.is_dir():
+        raise HTTPException(404, "unknown run")
+    return run_dir
+
+
+def _reveal(path: Path) -> None:
+    path = path.resolve()
+    if sys.platform == "darwin":
+        cmd = ["open", "-R", str(path)] if path.is_file() else ["open", str(path)]
+    elif sys.platform == "win32":
+        cmd = ["explorer", f"/select,{path}"] if path.is_file() else ["explorer", str(path)]
+    else:
+        cmd = ["xdg-open", str(path.parent if path.is_file() else path)]
+    subprocess.Popen(cmd, start_new_session=True)
+
+
 def _status_from_disk() -> dict:
     global _run_id
     run_dir = RUNS / _run_id if _run_id else _latest_run()
@@ -215,6 +235,18 @@ def video(run_id: str, episode: int):
     if not path.exists():
         raise HTTPException(404, "render that episode first")
     return FileResponse(path, media_type="video/mp4")
+
+
+@app.post("/runs/{run_id}/episodes/{episode}/open")
+def open_episode_folder(run_id: str, episode: int):
+    run_dir = _safe_run(run_id)
+    video = run_dir / "videos" / f"ep_{episode}.mp4"
+    target = video if video.is_file() else run_dir
+    try:
+        _reveal(target)
+    except OSError as e:
+        raise HTTPException(500, f"could not open folder: {e}") from e
+    return {"path": str(target)}
 
 
 @app.get("/runs/{run_id}/eval")

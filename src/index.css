@@ -90,6 +90,17 @@ body,
   border-bottom: 1px solid #2a241e;
 }
 
+.ep-actions {
+  display: flex;
+  gap: 4px;
+  flex-shrink: 0;
+}
+
+.ep-actions button {
+  padding: 6px 8px;
+  font-size: 12px;
+}
+
 .field input[type="number"],
 .field input[type="file"],
 .field textarea {

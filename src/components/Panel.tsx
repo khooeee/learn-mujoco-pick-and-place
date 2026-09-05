@@ -298,7 +298,10 @@ export function Panel() {
 
       <section>
         <h2>3. Episodes</h2>
-        <p className="hint">Training stays headless. Click render, wait, then watch the mp4.</p>
+        <p className="hint">
+          Training stays headless. Render an mp4, or open the run folder (selects
+          the video in Finder when it exists).
+        </p>
         {videoUrl && (
           <button onClick={() => useTwin.getState().setVideoUrl(null)}>Clear video</button>
         )}
@@ -313,9 +316,27 @@ export function Panel() {
                 <span>
                   #{e.index} {e.success ? "lift" : "miss"} R {e.reward.toFixed(1)}
                 </span>
-                <button
-                  disabled={!runId || renderBusy !== null}
-                  onClick={() => {
+                <div className="ep-actions">
+                  <button
+                    disabled={!runId || !rlOnline}
+                    onClick={() => {
+                      const id = useTwin.getState().runId;
+                      if (!id) return;
+                      void (async () => {
+                        try {
+                          await rl.openEpisode(id, e.index);
+                          useTwin.getState().log(`Opened folder for episode ${e.index}`);
+                        } catch (err) {
+                          useTwin.getState().log(err instanceof Error ? err.message : "open failed");
+                        }
+                      })();
+                    }}
+                  >
+                    folder
+                  </button>
+                  <button
+                    disabled={!runId || renderBusy !== null}
+                    onClick={() => {
                     const id = useTwin.getState().runId;
                     if (!id) return;
                     useTwin.getState().setRenderBusy(e.index);
@@ -335,6 +356,7 @@ export function Panel() {
                 >
                   {renderBusy === e.index ? "rendering…" : e.has_video ? "view mp4" : "render mp4"}
                 </button>
+                </div>
               </div>
             ))}
         </div>

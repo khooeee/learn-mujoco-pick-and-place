@@ -96,6 +96,8 @@ export const rl = {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ run_id: runId, episode }),
     }),
+  openEpisode: (runId: string, episode: number) =>
+    req(`/runs/${encodeURIComponent(runId)}/episodes/${episode}/open`, { method: "POST" }),
   videoUrl: (runId: string, episode: number) => `${PREFIX}/runs/${runId}/videos/${episode}`,
   objectMeshUrl: (id: string) => `${PREFIX}/objects/${encodeURIComponent(id)}/mesh`,
   objectGlbUrl: (id: string) => `${PREFIX}/objects/${encodeURIComponent(id)}/source.glb`,

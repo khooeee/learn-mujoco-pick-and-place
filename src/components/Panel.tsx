@@ -226,6 +226,30 @@ export function Panel() {
         <div className="row">
           <button
             className="primary"
+            disabled={!rlOnline || running || !runId}
+            onClick={() => {
+              void (async () => {
+                const s = useTwin.getState();
+                try {
+                  await rl.start(s.episodesTarget, true);
+                  s.log("Resuming from last checkpoint");
+                } catch (e) {
+                  s.log(e instanceof Error ? e.message : "resume failed");
+                }
+              })();
+            }}
+          >
+            Resume
+          </button>
+          <button
+            disabled={!rlOnline || !running}
+            onClick={() => {
+              void rl.stop().then(() => useTwin.getState().log("Stop requested"));
+            }}
+          >
+            Stop
+          </button>
+          <button
             disabled={!rlOnline || running || (objects ?? []).length === 0}
             onClick={() => {
               void (async () => {
@@ -241,31 +265,7 @@ export function Panel() {
               })();
             }}
           >
-            Train
-          </button>
-          <button
-            disabled={!rlOnline || !running}
-            onClick={() => {
-              void rl.stop().then(() => useTwin.getState().log("Stop requested"));
-            }}
-          >
-            Stop
-          </button>
-          <button
-            disabled={!rlOnline || running || !runId}
-            onClick={() => {
-              void (async () => {
-                const s = useTwin.getState();
-                try {
-                  await rl.start(s.episodesTarget, true);
-                  s.log("Resuming from last checkpoint");
-                } catch (e) {
-                  s.log(e instanceof Error ? e.message : "resume failed");
-                }
-              })();
-            }}
-          >
-            Resume
+            Train New
           </button>
         </div>
         {status && (

@@ -22,7 +22,6 @@ function RateChart({ points }: { points: { episode: number; rate: number }[] }) 
 }
 
 export function Panel() {
-  const logs = useTwin((s) => s.logs);
   const rlOnline = useTwin((s) => s.rlOnline);
   const status = useTwin((s) => s.status);
   const runId = useTwin((s) => s.runId);
@@ -341,15 +340,6 @@ export function Panel() {
               </div>
             ))}
         </div>
-      </section>
-
-      <section>
-        <h2>Log</h2>
-        <ul className="log">
-          {logs.map((l) => (
-            <li key={l.t + l.text}>{l.text}</li>
-          ))}
-        </ul>
       </section>
     </aside>
   );

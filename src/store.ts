@@ -1,10 +1,7 @@
 import { create } from "zustand";
 import type { EpisodeRow, MintObject, TrainStatus } from "./lib/rlApi";
 
-type LogItem = { t: number; text: string };
-
 type Store = {
-  logs: LogItem[];
   rlOnline: boolean;
   status: TrainStatus | null;
   runId: string | null;
@@ -37,7 +34,6 @@ type Store = {
 };
 
 export const useTwin = create<Store>((set) => ({
-  logs: [],
   rlOnline: false,
   status: null,
   runId: null,
@@ -53,10 +49,9 @@ export const useTwin = create<Store>((set) => ({
   selectedId: null,
   previewId: null,
   previewPrompt: null,
-  log: (text) =>
-    set((s) => ({
-      logs: [{ t: Date.now(), text }, ...s.logs].slice(0, 24),
-    })),
+  log: (text) => {
+    console.log(text);
+  },
   setRlOnline: (rlOnline) => set({ rlOnline }),
   setStatus: (status) => set({ status }),
   setRunId: (runId) => set({ runId }),

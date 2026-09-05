@@ -1,5 +1,5 @@
 import { useEffect } from "react";
-import { generateBoxWithMint, generateObjectWithTripo, generateWorldWithMarble } from "../lib/cloud";
+import { generateBoxWithMint, generateObjectWithTripo } from "../lib/cloud";
 import { rl } from "../lib/rlApi";
 import { useTwin } from "../store";
 
@@ -52,7 +52,6 @@ function RateChart({ points }: { points: { episode: number; rate: number }[] }) 
 }
 
 export function Panel() {
-  const tablePhoto = useTwin((s) => s.tablePhoto);
   const objectPhoto = useTwin((s) => s.objectPhoto);
   const logs = useTwin((s) => s.logs);
   const cloud = useTwin((s) => s.cloud);
@@ -106,9 +105,9 @@ export function Panel() {
         <p className="kicker">Physical AI · SO-101 · PPO</p>
         <h1>TwinPick</h1>
         <p className="lede">
-          Photos become optional 3D assets. Training is vision RL in MuJoCo on a
-          real SO-101 model: cameras in, joints out, lift reward. No IK. Replay
-          any episode as an mp4.
+          Training is vision RL in MuJoCo on a real SO-101: cameras in, joints
+          out, lift reward. No IK. Replay any episode as an mp4. Optionally
+          import an object photo via Tripo.
         </p>
         <p className="metric">
           trainer {rlOnline ? "connected" : "offline — run python ml/server.py"}
@@ -116,16 +115,7 @@ export function Panel() {
       </header>
 
       <section>
-        <h2>1. Reality (optional ingest)</h2>
-        <PhotoField
-          label="Photo of the table"
-          hint="Backdrop only. World Labs is visual, not MuJoCo collision."
-          value={tablePhoto}
-          onChange={(url) => {
-            useTwin.getState().setTablePhoto(url);
-            useTwin.getState().log("Table photo loaded");
-          }}
-        />
+        <h2>1. Object (optional)</h2>
         <PhotoField
           label="Photo of an object"
           hint="Tripo mesh for later mix. v1 train uses random boxes/cylinders."
@@ -135,21 +125,11 @@ export function Panel() {
             useTwin.getState().log("Object photo loaded");
           }}
         />
-      </section>
-
-      <section>
-        <h2>2. Cloud 3D</h2>
         <p className="hint">
           {convexOn
             ? "Convex is connected."
-            : "Sim train works without keys. For World Labs / Tripo / Mint: npx convex dev."}
+            : "Train works without keys. For Tripo / Mint: npx convex dev."}
         </p>
-        <div className="row">
-          <button disabled={!convexOn || !tablePhoto} onClick={() => void generateWorldWithMarble()}>
-            Make room · World Labs
-          </button>
-          <span className="status">{cloud.worldStatus}</span>
-        </div>
         <div className="row">
           <button disabled={!convexOn || !objectPhoto} onClick={() => void generateObjectWithTripo()}>
             Make object · Tripo
@@ -162,15 +142,10 @@ export function Panel() {
           </button>
           <span className="status">{cloud.mintStatus}</span>
         </div>
-        {cloud.marbleUrl && (
-          <a className="marble" href={cloud.marbleUrl} target="_blank" rel="noreferrer">
-            Open World Labs viewer
-          </a>
-        )}
       </section>
 
       <section>
-        <h2>3. Train (headless MuJoCo)</h2>
+        <h2>2. Train (headless MuJoCo)</h2>
         <label className="field">
           <span>Episodes</span>
           <input
@@ -237,7 +212,7 @@ export function Panel() {
       </section>
 
       <section>
-        <h2>4. Episodes</h2>
+        <h2>3. Episodes</h2>
         <p className="hint">Training stays headless. Click render, wait, then watch the mp4.</p>
         {videoUrl && (
           <button onClick={() => useTwin.getState().setVideoUrl(null)}>Clear video</button>

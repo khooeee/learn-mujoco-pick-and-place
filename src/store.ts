@@ -4,17 +4,12 @@ import type { EpisodeRow, TrainStatus } from "./lib/rlApi";
 type LogItem = { t: number; text: string };
 
 type Cloud = {
-  splatUrl?: string;
-  marbleUrl?: string;
   objectGlbUrl?: string;
-  colliderUrl?: string;
-  worldStatus: string;
   objectStatus: string;
   mintStatus: string;
 };
 
 type Store = {
-  tablePhoto: string | null;
   objectPhoto: string | null;
   logs: LogItem[];
   cloud: Cloud;
@@ -26,7 +21,6 @@ type Store = {
   videoUrl: string | null;
   renderBusy: number | null;
   episodesTarget: number;
-  setTablePhoto: (url: string | null) => void;
   setObjectPhoto: (url: string | null) => void;
   log: (text: string) => void;
   setCloud: (patch: Partial<Cloud>) => void;
@@ -41,11 +35,9 @@ type Store = {
 };
 
 export const useTwin = create<Store>((set) => ({
-  tablePhoto: null,
   objectPhoto: null,
   logs: [],
   cloud: {
-    worldStatus: "idle",
     objectStatus: "idle",
     mintStatus: "idle",
   },
@@ -57,7 +49,6 @@ export const useTwin = create<Store>((set) => ({
   videoUrl: null,
   renderBusy: null,
   episodesTarget: 200,
-  setTablePhoto: (url) => set({ tablePhoto: url }),
   setObjectPhoto: (url) => set({ objectPhoto: url }),
   log: (text) =>
     set((s) => ({

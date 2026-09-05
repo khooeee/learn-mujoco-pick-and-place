@@ -39,32 +39,6 @@ async function uploadToConvex(file: File): Promise<string> {
   return json.storageId;
 }
 
-export async function generateWorldWithMarble() {
-  const st = useTwin.getState();
-  if (!st.tablePhoto) return;
-  st.setCloud({ worldStatus: "uploading…" });
-  try {
-    const file = await blobFromObjectUrl(st.tablePhoto, "table.jpg");
-    const storageId = await uploadToConvex(file);
-    st.setCloud({ worldStatus: "World Labs generating… (a few min)" });
-    const out = (await callAction("generate.worldFromPhoto", { storageId })) as {
-      splatUrl?: string;
-      marbleUrl?: string;
-      colliderUrl?: string;
-    };
-    st.setCloud({
-      worldStatus: "ready",
-      splatUrl: out.splatUrl,
-      marbleUrl: out.marbleUrl,
-      colliderUrl: out.colliderUrl,
-    });
-    st.log("World Labs room is in the scene");
-  } catch (e) {
-    st.setCloud({ worldStatus: "error" });
-    st.log(`World Labs: ${e instanceof Error ? e.message : "failed"}`);
-  }
-}
-
 export async function generateObjectWithTripo() {
   const st = useTwin.getState();
   if (!st.objectPhoto) return;

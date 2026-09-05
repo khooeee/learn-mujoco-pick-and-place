@@ -36,7 +36,7 @@ def render_episode(run_id: str, index: int, video: Path | None, view: bool) -> P
     if row is None:
         raise SystemExit(f"episode {index} not in {run_id}")
 
-    env = PickEnv(render=True, seed=int(row["seed"]), img_size=256)
+    env = PickEnv(render=True, seed=int(row["seed"]), img_size=256, textured=True)
     env.reset(seed=int(row["seed"]), spec=spec_from_row(row))
     frames: list[np.ndarray] = []
 

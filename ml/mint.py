@@ -9,7 +9,7 @@ import urllib.error
 import urllib.request
 from pathlib import Path
 
-from library import object_dir, rescale_glb, save_object
+from library import object_dir, rescale_glb, save_object, write_visual_from_glb
 
 ROOT = Path(__file__).resolve().parent
 API = "https://api.mint.gg/v1"
@@ -127,5 +127,7 @@ def generate_from_prompt(prompt: str) -> dict:
         glb = res.read()
     stl, dims = rescale_glb(glb)
     dest = save_object(prompt, stl, {"mint_model_id": str(model_id), "source": "mint", **dims})
-    (object_dir(dest["id"]) / "source.glb").write_bytes(glb)
+    d = object_dir(dest["id"])
+    (d / "source.glb").write_bytes(glb)
+    write_visual_from_glb(glb, d)
     return dest

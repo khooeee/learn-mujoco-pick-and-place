@@ -9,12 +9,16 @@ import shutil
 import mujoco
 import numpy as np
 
-from library import load_meta, require_object_id, stl_path
+from library import ensure_visual, load_meta, obj_path, png_path, require_object_id, stl_path
 
 ROOT = Path(__file__).resolve().parent
 SCENE = ROOT / "so101" / "pick_scene.xml"
 SCENE_MESH = ROOT / "so101" / "pick_mesh.xml"
-RUNTIME_STL = ROOT / "so101" / "assets" / "runtime_object.stl"
+SCENE_TEX = ROOT / "so101" / "pick_tex.xml"
+ASSETS = ROOT / "so101" / "assets"
+RUNTIME_STL = ASSETS / "runtime_object.stl"
+RUNTIME_OBJ = ASSETS / "runtime_object.obj"
+RUNTIME_PNG = ASSETS / "runtime_object.png"
 JOINT_NAMES = [
     "shoulder_pan",
     "shoulder_lift",
@@ -40,16 +44,17 @@ class ObjectSpec:
 
 
 class PickEnv:
-    def __init__(self, render: bool = True, seed: int = 0, img_size: int = IMG) -> None:
+    def __init__(self, render: bool = True, seed: int = 0, img_size: int = IMG, textured: bool = False) -> None:
         self.rng = np.random.default_rng(seed)
         self.render_enabled = render
         self.img_size = img_size
-        self.renderer: mujoco.Renderer | None = None
+        self.textured = textured
         self.n_act = 6
         self.action_repeat = 8
         self.max_actions = 80
         self._t = 0
-        self._mesh_id = None
+        self._mesh_key = None
+        self.renderer: mujoco.Renderer | None = None
         self.model = None  # type: ignore[assignment]
         self.data = None  # type: ignore[assignment]
         self.spec = ObjectSpec(0.22, 0.0, 0.07, 0.056, 0.044, 0, (0.85, 0.38, 0.16, 1.0))
@@ -71,7 +76,9 @@ class PickEnv:
             self.renderer = mujoco.Renderer(self.model, height=self.img_size, width=self.img_size)
 
     def _load_scene(self, mesh_id: str | None) -> None:
-        if mesh_id == self._mesh_id and self.model is not None:
+        use_tex = bool(self.textured and mesh_id and ensure_visual(mesh_id))
+        key = (mesh_id, use_tex)
+        if key == self._mesh_key and self.model is not None:
             return
         self.renderer = None
         if mesh_id:
@@ -79,11 +86,16 @@ class PickEnv:
             if not src.exists():
                 raise FileNotFoundError(f"object {mesh_id} has no STL")
             shutil.copy(src, RUNTIME_STL)
-            self.model = mujoco.MjModel.from_xml_path(str(SCENE_MESH))
+            if use_tex:
+                shutil.copy(obj_path(mesh_id), RUNTIME_OBJ)
+                shutil.copy(png_path(mesh_id), RUNTIME_PNG)
+                self.model = mujoco.MjModel.from_xml_path(str(SCENE_TEX))
+            else:
+                self.model = mujoco.MjModel.from_xml_path(str(SCENE_MESH))
         else:
             self.model = mujoco.MjModel.from_xml_path(str(SCENE))
         self.data = mujoco.MjData(self.model)
-        self._mesh_id = mesh_id
+        self._mesh_key = key
         self._bind()
 
     def _place_object(self, spec: ObjectSpec) -> None:

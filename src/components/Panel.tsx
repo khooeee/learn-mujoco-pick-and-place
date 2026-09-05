@@ -358,32 +358,46 @@ export function Panel() {
                 <span>
                   #{e.index} {e.success ? "lift" : "miss"} R {e.reward.toFixed(1)}
                 </span>
-                <button
+                <div className="ep-actions">
+                  <button
                     disabled={!runId || renderBusy !== null}
                     onClick={() => {
-                    const id = useTwin.getState().runId;
-                    if (!id) return;
-                    if (e.has_video) {
-                      useTwin.getState().setVideoUrl(rl.videoUrl(id, e.index));
-                      return;
-                    }
-                    useTwin.getState().setRenderBusy(e.index);
-                    useTwin.getState().log(`Rendering episode ${e.index}…`);
-                    void (async () => {
-                      try {
-                        await rl.render(id, e.index);
-                        useTwin.getState().setVideoUrl(rl.videoUrl(id, e.index) + `?t=${Date.now()}`);
-                        useTwin.getState().log(`Episode ${e.index} ready`);
-                      } catch (err) {
-                        useTwin.getState().log(err instanceof Error ? err.message : "render failed");
-                      } finally {
-                        useTwin.getState().setRenderBusy(null);
-                      }
-                    })();
-                  }}
-                >
-                  {renderBusy === e.index ? "rendering…" : e.has_video ? "view mp4" : "render mp4"}
-                </button>
+                      const id = useTwin.getState().runId;
+                      if (!id) return;
+                      useTwin.getState().setRenderBusy(e.index);
+                      useTwin.getState().log(`Rendering episode ${e.index}…`);
+                      void (async () => {
+                        try {
+                          await rl.render(id, e.index);
+                          const s = useTwin.getState();
+                          s.setEpisodes(
+                            s.episodes.map((row) =>
+                              row.index === e.index ? { ...row, has_video: true } : row,
+                            ),
+                          );
+                          s.setVideoUrl(rl.videoUrl(id, e.index) + `?t=${Date.now()}`);
+                          s.log(`Episode ${e.index} ready`);
+                        } catch (err) {
+                          useTwin.getState().log(err instanceof Error ? err.message : "render failed");
+                        } finally {
+                          useTwin.getState().setRenderBusy(null);
+                        }
+                      })();
+                    }}
+                  >
+                    {renderBusy === e.index ? "rendering…" : "render"}
+                  </button>
+                  <button
+                    disabled={!runId || !e.has_video}
+                    onClick={() => {
+                      const id = useTwin.getState().runId;
+                      if (!id) return;
+                      useTwin.getState().setVideoUrl(rl.videoUrl(id, e.index) + `?t=${Date.now()}`);
+                    }}
+                  >
+                    view
+                  </button>
+                </div>
               </div>
             ))}
         </div>

@@ -145,7 +145,7 @@ export function Panel() {
       <section>
         <h2>1. Object</h2>
         <p className="hint">
-          Mint or import a GLB. Either way we rescale to 7 cm and save it. Use
+          Mint or import a GLB. Either way we rescale to 4.5 cm and save it. Use
           any saved object; the next episode picks it up.
         </p>
         <label className="field">

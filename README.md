@@ -19,7 +19,7 @@ npm run dev         # UI on :5173
 
 Open http://localhost:5173
 
-1. **Object** — Mint a mesh, or import a `.glb`. Both are rescaled to ~7 cm and saved in `ml/assets/objects/`. Pick a saved object for training.
+1. **Object** — Mint a mesh, or import a `.glb`. Both are rescaled to ~4.5 cm and saved in `ml/assets/objects/`. Pick a saved object for training.
 2. **Runs** — click a row, then **Resume** to continue that checkpoint. **Train New** starts a fresh folder.
 3. **Episodes → render mp4** — waits, then plays in the stage (overhead | wrist). Replay uses the GLB albedo on the object when a texture exists.
 
@@ -39,7 +39,7 @@ cd ml
 - Critic: those **plus** object pose (training only)
 - Actions: 6 SO-101 actuators, no inverse kinematics
 - Reward: reach object and lift it
-- Objects: Mint prompt or GLB import → local library. Longest edge is 7 cm on import.
+- Objects: Mint prompt or GLB import → local library. Longest edge is 4.5 cm on import.
 
 Not SmolVLA / ACT. Not the old browser IK toy arm.
 

@@ -12,7 +12,7 @@ from io import BytesIO
 ROOT = Path(__file__).resolve().parent
 OBJECTS = ROOT / "assets" / "objects"
 SELECTED = OBJECTS / "selected.json"
-TARGET_EXTENT = 0.07  # longest edge after rescale (meters)
+TARGET_EXTENT = 0.045  # longest edge after rescale (meters); SO-101 jaws open ~7 cm
 
 
 def _slug(prompt: str) -> str:
@@ -130,7 +130,7 @@ def _diffuse_image(mesh):
 
 
 def write_visual_from_glb(glb: bytes, dest: Path) -> bool:
-    """Rescaled OBJ + PNG for MuJoCo replay. Same 7 cm frame as the STL."""
+    """Rescaled OBJ + PNG for MuJoCo replay. Same frame as the STL."""
     from trimesh.visual import TextureVisuals
     from trimesh.visual.material import SimpleMaterial
 

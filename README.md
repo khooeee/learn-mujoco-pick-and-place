@@ -94,15 +94,18 @@ Those 6 values are mapped linearly onto each actuator’s `ctrlrange`. No IK: th
 **Reward** (after each policy step)
 
 ```
-r = -0.4 × ||object − gripper||
+r = 1.2 × (previous XY error − current XY error)   # progress toward the object on the table
+  − 0.15 × ||object − gripper||                    # weak 3D reach
+  + hover-above bonus while XY is still far
   + gated grasp (jaws around object, matching width, closing)
-  + 0.4 per jaw contact with the object
-  + 2.5 × max(0, lift − 2 cm)
-  + 4.0 if lift > 8 cm and gripper still close
+  + 0.4 per jaw contact + 1.5 if both jaws pinch
+  + 2.5 × max(0, lift − 2 cm)  only while grasped
+  + 4.0 if lift > 8 cm, gripper close, and grasped
+  − knock penalty if the object slides without lifting
   − 0.5 × tilt if the object is knocked past ~60°
   − 1.0 if the object falls through the table
 ```
 
-Closing the gripper only scores when the object is between the jaws (within ~5 cm of the TCP). Closing in free space is a small penalty.
+Closing the gripper only scores when the object is between the jaws (within ~5 cm of the TCP). Closing in free space is a small penalty. Lift is not paid for batting the object into the air.
 
-Success = object more than 8 cm above the table and within 12 cm of the gripper.
+Success = object more than 8 cm above the table, within 12 cm of the gripper, and actually grasped.

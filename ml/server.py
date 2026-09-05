@@ -238,7 +238,7 @@ def runs():
     if not RUNS.exists():
         return []
     out = []
-    for p in sorted(RUNS.iterdir(), key=lambda x: x.stat().st_mtime, reverse=True):
+    for p in sorted(RUNS.iterdir(), key=lambda x: x.name, reverse=True):
         if not p.is_dir():
             continue
         st = read_json(p / "status.json") if (p / "status.json").exists() else {}

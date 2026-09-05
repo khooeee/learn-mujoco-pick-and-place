@@ -64,6 +64,7 @@ class PickEnv:
         self.spec = ObjectSpec(0.22, 0.0, 0.07, 0.056, 0.044, 0, (0.85, 0.38, 0.16, 1.0))
         self._start_z = TABLE_TOP
         self._open_prev = 0.5
+        self._xy_prev = 0.0
         self._fixed_jaw_geoms: np.ndarray = np.zeros(0, dtype=np.int32)
         self._moving_jaw_geoms: np.ndarray = np.zeros(0, dtype=np.int32)
         self._load_scene(None)
@@ -175,6 +176,9 @@ class PickEnv:
         for _ in range(20):
             mujoco.mj_step(self.model, self.data)
         self._open_prev = self._gripper_open()
+        obj = self.data.xpos[self.obj_body]
+        grip = self.data.site_xpos[self.grip_site]
+        self._xy_prev = float(np.hypot(obj[0] - grip[0], obj[1] - grip[1]))
         return self.observe()
 
     def _joints(self) -> np.ndarray:
@@ -272,6 +276,7 @@ class PickEnv:
         obj = self.data.xpos[self.obj_body]
         grip = self.data.site_xpos[self.grip_site]
         dist = float(np.linalg.norm(obj - grip))
+        xy = float(np.hypot(obj[0] - grip[0], obj[1] - grip[1]))
         lift = float(obj[2] - TABLE_TOP)
         open_now = self._gripper_open()
         around = self._around(obj, dist)
@@ -281,16 +286,34 @@ class PickEnv:
         r_grasp = around * (0.8 * (1.0 - np.tanh(width_err / 0.01)) + 1.2 * close_delta)
         r_grasp -= (1.0 - around) * close_delta * 0.3
         touch_fixed, touch_moving = self._jaw_contacts()
-        r_contact = 0.4 * touch_fixed + 0.4 * touch_moving
+        pinch = touch_fixed * touch_moving
+        r_contact = 0.4 * touch_fixed + 0.4 * touch_moving + 1.5 * pinch
+        grasped = pinch > 0.0 or around > 0.5
+        r_lift = 2.5 * max(0.0, lift - 0.02) * (1.0 if grasped else 0.0)
         upright = float(self.data.xmat[self.obj_body].reshape(3, 3)[2, 2])
         r_tilt = -0.5 * max(0.0, 0.5 - upright)
-        r = -0.4 * dist + 2.5 * max(0.0, lift - 0.02) + float(r_grasp) + r_contact + r_tilt
-        success = lift > 0.08 and dist < 0.12
+        knock_xy = float(np.hypot(obj[0] - self.spec.x, obj[1] - self.spec.y))
+        r_knock = -0.8 * max(0.0, knock_xy - 0.03) if lift < 0.03 else 0.0
+        r_xy = 1.2 * (self._xy_prev - xy)
+        above = float(grip[2] - obj[2])
+        r_above = 0.2 * float(np.clip(above, 0.0, 0.08)) if xy > 0.04 else 0.0
+        r = (
+            r_xy
+            - 0.15 * dist
+            + r_above
+            + r_lift
+            + float(r_grasp)
+            + r_contact
+            + r_tilt
+            + r_knock
+        )
+        success = lift > 0.08 and dist < 0.12 and grasped
         if success:
             r += 4.0
         if obj[2] < 0.01:
             r -= 1.0
         self._open_prev = open_now
+        self._xy_prev = xy
         return r, success
 
     def step(self, action: np.ndarray) -> tuple[dict, float, bool, dict]:

@@ -38,7 +38,8 @@ export function Panel() {
   const selectedId = useTwin((s) => s.selectedId);
   const previewId = useTwin((s) => s.previewId);
   const runs = useTwin((s) => s.runs);
-  const selectedRun = runs.find((r) => r.id === runId);
+  const runRows = [...runs].sort((a, b) => b.id.localeCompare(a.id));
+  const selectedRun = runRows.find((r) => r.id === runId);
   const glbInput = useRef<HTMLInputElement>(null);
   const [importBusy, setImportBusy] = useState(false);
 
@@ -243,8 +244,8 @@ export function Panel() {
         <h2>2. Runs</h2>
         <p className="hint">Click a run to load its episodes. Resume continues the highlighted run.</p>
         <div className="runs-wrap">
-          {(runs ?? []).length === 0 && <p className="hint">No runs yet.</p>}
-          {(runs ?? []).length > 0 && (
+          {(runRows ?? []).length === 0 && <p className="hint">No runs yet.</p>}
+          {(runRows ?? []).length > 0 && (
             <table className="runs">
               <thead>
                 <tr>
@@ -258,7 +259,7 @@ export function Panel() {
                 </tr>
               </thead>
               <tbody>
-                {runs.map((r) => (
+                {runRows.map((r) => (
                   <tr
                     key={r.id}
                     className={r.id === runId ? "on" : ""}

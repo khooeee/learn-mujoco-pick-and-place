@@ -44,7 +44,7 @@ def render_episode(run_id: str, index: int, video: Path | None, view: bool) -> P
         assert env.renderer is not None
         env.renderer.update_scene(env.data, camera=env.overhead_cam)
         overhead = env.renderer.render()
-        env.renderer.update_scene(env.data, camera=env._wrist_camera())
+        env.renderer.update_scene(env.data, camera=env.wrist_cam)
         wrist = env.renderer.render()
         h = overhead.shape[0]
         gap = np.zeros((h, 4, 3), dtype=overhead.dtype)

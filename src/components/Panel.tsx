@@ -363,6 +363,10 @@ export function Panel() {
                     onClick={() => {
                     const id = useTwin.getState().runId;
                     if (!id) return;
+                    if (e.has_video) {
+                      useTwin.getState().setVideoUrl(rl.videoUrl(id, e.index));
+                      return;
+                    }
                     useTwin.getState().setRenderBusy(e.index);
                     useTwin.getState().log(`Rendering episode ${e.index}…`);
                     void (async () => {

@@ -72,6 +72,9 @@ class PickEnv:
         self.grip_site = mujoco.mj_name2id(self.model, mujoco.mjtObj.mjOBJ_SITE, "gripperframe")
         self.grip_body = self.model.body("gripper").id
         self.overhead_cam = mujoco.mj_name2id(self.model, mujoco.mjtObj.mjOBJ_CAMERA, "overhead")
+        self.wrist_cam = mujoco.mj_name2id(self.model, mujoco.mjtObj.mjOBJ_CAMERA, "wrist")
+        if self.wrist_cam < 0:
+            raise RuntimeError("scene is missing wrist camera on the gripper")
         if self.render_enabled:
             self.renderer = mujoco.Renderer(self.model, height=self.img_size, width=self.img_size)
 
@@ -161,21 +164,12 @@ class PickEnv:
         rgb = self.renderer.render()
         return rgb.astype(np.float32) / 255.0
 
-    def _wrist_camera(self) -> mujoco.MjvCamera:
-        cam = mujoco.MjvCamera()
-        cam.type = mujoco.mjtCamera.mjCAMERA_TRACKING
-        cam.trackbodyid = self.grip_body
-        cam.distance = 0.18
-        cam.elevation = -25.0
-        cam.azimuth = 140.0
-        return cam
-
     def observe(self) -> dict:
         joints = self._joints()
         priv = self._priv()
         if self.render_enabled and self.renderer is not None:
             overhead = np.transpose(self._render(self.overhead_cam), (2, 0, 1))
-            wrist = np.transpose(self._render(self._wrist_camera()), (2, 0, 1))
+            wrist = np.transpose(self._render(self.wrist_cam), (2, 0, 1))
             img = np.concatenate([overhead, wrist], axis=0)
         else:
             img = np.zeros((6, self.img_size, self.img_size), dtype=np.float32)

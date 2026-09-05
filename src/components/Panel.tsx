@@ -343,9 +343,7 @@ export function Panel() {
 
       <section>
         <h2>4. Episodes</h2>
-        <p className="hint">
-          Episodes for the selected run. Render an mp4, or open the folder in Finder.
-        </p>
+        <p className="hint">Episodes for the selected run. Render an mp4 to watch it.</p>
         {videoUrl && (
           <button onClick={() => useTwin.getState().setVideoUrl(null)}>Clear video</button>
         )}
@@ -360,25 +358,7 @@ export function Panel() {
                 <span>
                   #{e.index} {e.success ? "lift" : "miss"} R {e.reward.toFixed(1)}
                 </span>
-                <div className="ep-actions">
-                  <button
-                    disabled={!runId || !rlOnline}
-                    onClick={() => {
-                      const id = useTwin.getState().runId;
-                      if (!id) return;
-                      void (async () => {
-                        try {
-                          await rl.openEpisode(id, e.index);
-                          useTwin.getState().log(`Opened folder for episode ${e.index}`);
-                        } catch (err) {
-                          useTwin.getState().log(err instanceof Error ? err.message : "open failed");
-                        }
-                      })();
-                    }}
-                  >
-                    folder
-                  </button>
-                  <button
+                <button
                     disabled={!runId || renderBusy !== null}
                     onClick={() => {
                     const id = useTwin.getState().runId;
@@ -400,7 +380,6 @@ export function Panel() {
                 >
                   {renderBusy === e.index ? "rendering…" : e.has_video ? "view mp4" : "render mp4"}
                 </button>
-                </div>
               </div>
             ))}
         </div>

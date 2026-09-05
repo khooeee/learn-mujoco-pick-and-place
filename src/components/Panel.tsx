@@ -76,7 +76,14 @@ export function Panel() {
         s.setObjects(objs.items, objs.selected);
         s.setStatus(st);
         s.setRuns(runList);
-        if (s.followLive && st.run_id) s.setRunId(st.run_id);
+        const sorted = [...runList].sort((a, b) => b.id.localeCompare(a.id));
+        const live = Boolean((st.state === "running" || st.alive) && st.run_id);
+        const current = useTwin.getState().runId;
+        if (live && (s.followLive || !current)) {
+          s.setRunId(st.run_id);
+        } else if (!current && sorted[0]) {
+          s.selectRun(sorted[0].id, false);
+        }
         const id = useTwin.getState().runId;
         if (id) {
           const [eps, met] = await Promise.all([rl.episodes(id), rl.metrics(id)]);

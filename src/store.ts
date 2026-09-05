@@ -57,7 +57,7 @@ export const useTwin = create<Store>((set) => ({
   previewId: null,
   previewPrompt: null,
   runs: [],
-  followLive: true,
+  followLive: false,
   log: (text) => {
     console.log(text);
   },

@@ -35,6 +35,29 @@ body,
   object-fit: contain;
 }
 
+.empty-stage {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  padding: 48px 56px;
+  max-width: 36rem;
+}
+
+.empty-stage h2 {
+  font-size: 28px;
+  letter-spacing: 0;
+  text-transform: none;
+  color: #f3ece4;
+  margin: 0 0 12px;
+}
+
+.empty-stage p {
+  color: #b7a89a;
+  line-height: 1.5;
+  margin: 0;
+}
+
 .chart {
   display: block;
   margin: 8px 0;

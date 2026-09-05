@@ -29,6 +29,10 @@ JOINT_NAMES = [
 ]
 TABLE_TOP = 0.04
 IMG = 84
+GRIPPER_MAX_OPEN = 0.07  # meters at fully open (SO-101 hinge mapped linearly)
+AROUND_DIST = 0.05
+FIXED_JAW_MESH = "wrist_roll_follower_so101_v1"
+MOVING_JAW_MESH = "moving_jaw_so101_v1"
 
 
 @dataclass
@@ -59,6 +63,9 @@ class PickEnv:
         self.data = None  # type: ignore[assignment]
         self.spec = ObjectSpec(0.22, 0.0, 0.07, 0.056, 0.044, 0, (0.85, 0.38, 0.16, 1.0))
         self._start_z = TABLE_TOP
+        self._open_prev = 0.5
+        self._fixed_jaw_geoms: np.ndarray = np.zeros(0, dtype=np.int32)
+        self._moving_jaw_geoms: np.ndarray = np.zeros(0, dtype=np.int32)
         self._load_scene(None)
 
     def _bind(self) -> None:
@@ -71,12 +78,32 @@ class PickEnv:
         self.obj_geom = self.model.geom("object_geom").id
         self.grip_site = mujoco.mj_name2id(self.model, mujoco.mjtObj.mjOBJ_SITE, "gripperframe")
         self.grip_body = self.model.body("gripper").id
+        self._grip_qadr = int(self.model.joint("gripper").qposadr[0])
+        self._grip_lo, self._grip_hi = [float(x) for x in self.model.jnt_range[self.model.joint("gripper").id]]
+        self._bind_jaw_geoms()
         self.overhead_cam = mujoco.mj_name2id(self.model, mujoco.mjtObj.mjOBJ_CAMERA, "overhead")
         self.wrist_cam = mujoco.mj_name2id(self.model, mujoco.mjtObj.mjOBJ_CAMERA, "wrist")
         if self.wrist_cam < 0:
             raise RuntimeError("scene is missing wrist camera on the gripper")
         if self.render_enabled:
             self.renderer = mujoco.Renderer(self.model, height=self.img_size, width=self.img_size)
+
+    def _bind_jaw_geoms(self) -> None:
+        fixed, moving = [], []
+        for gid in range(self.model.ngeom):
+            if int(self.model.geom_contype[gid]) == 0:
+                continue
+            if int(self.model.geom_type[gid]) != int(mujoco.mjtGeom.mjGEOM_MESH):
+                continue
+            mesh = mujoco.mj_id2name(
+                self.model, mujoco.mjtObj.mjOBJ_MESH, int(self.model.geom_dataid[gid])
+            )
+            if mesh == FIXED_JAW_MESH:
+                fixed.append(gid)
+            elif mesh == MOVING_JAW_MESH:
+                moving.append(gid)
+        self._fixed_jaw_geoms = np.array(fixed, dtype=np.int32)
+        self._moving_jaw_geoms = np.array(moving, dtype=np.int32)
 
     def _load_scene(self, mesh_id: str | None) -> None:
         use_tex = bool(self.textured and mesh_id and ensure_visual(mesh_id))
@@ -147,6 +174,7 @@ class PickEnv:
         self._t = 0
         for _ in range(20):
             mujoco.mj_step(self.model, self.data)
+        self._open_prev = self._gripper_open()
         return self.observe()
 
     def _joints(self) -> np.ndarray:
@@ -179,17 +207,90 @@ class PickEnv:
         a = np.clip(a, -1.0, 1.0)
         return 0.5 * (a + 1.0) * (self.ctrl_hi - self.ctrl_lo) + self.ctrl_lo
 
+    def _gripper_open(self) -> float:
+        q = float(self.data.qpos[self._grip_qadr])
+        span = max(self._grip_hi - self._grip_lo, 1e-6)
+        return float(np.clip((q - self._grip_lo) / span, 0.0, 1.0))
+
+    @staticmethod
+    def _band(x: float, inner: float, outer: float) -> float:
+        ax = abs(x)
+        if ax <= inner:
+            return 1.0
+        if ax >= outer:
+            return 0.0
+        return (outer - ax) / (outer - inner)
+
+    def _tcp_frame(self) -> tuple[np.ndarray, np.ndarray]:
+        tcp = self.data.site_xpos[self.grip_site]
+        rot = self.data.site_xmat[self.grip_site].reshape(3, 3)
+        return tcp, rot
+
+    def _around(self, obj: np.ndarray, dist: float) -> float:
+        tcp, rot = self._tcp_frame()
+        local = rot.T @ (obj - tcp)
+        near = self._band(dist, 0.03, AROUND_DIST)
+        lateral = self._band(float(local[1]), 0.025, 0.045)
+        x = float(local[0])
+        if -0.10 <= x <= 0.04:
+            depth = 1.0
+        elif -0.12 <= x <= 0.06:
+            depth = 0.5
+        else:
+            depth = 0.0
+        between = 0.0
+        if self._fixed_jaw_geoms.size and self._moving_jaw_geoms.size:
+            z_f = float((rot.T @ (self.data.geom_xpos[int(self._fixed_jaw_geoms[0])] - tcp))[2])
+            z_m = float((rot.T @ (self.data.geom_xpos[int(self._moving_jaw_geoms[0])] - tcp))[2])
+            lo, hi = (z_f, z_m) if z_f < z_m else (z_m, z_f)
+            pad = 0.012 + 0.35 * float(self.spec.w)
+            if lo - pad <= float(local[2]) <= hi + pad:
+                between = 1.0
+        else:
+            between = self._band(float(local[2]), 0.03, 0.05)
+        return near * lateral * depth * between
+
+    def _jaw_contacts(self) -> tuple[float, float]:
+        touch_fixed = 0.0
+        touch_moving = 0.0
+        fixed = set(int(g) for g in self._fixed_jaw_geoms)
+        moving = set(int(g) for g in self._moving_jaw_geoms)
+        obj = int(self.obj_geom)
+        for i in range(int(self.data.ncon)):
+            c = self.data.contact[i]
+            g1, g2 = int(c.geom1), int(c.geom2)
+            other = g2 if g1 == obj else g1 if g2 == obj else None
+            if other is None:
+                continue
+            if other in fixed:
+                touch_fixed = 1.0
+            elif other in moving:
+                touch_moving = 1.0
+        return touch_fixed, touch_moving
+
     def _reward(self) -> tuple[float, bool]:
         obj = self.data.xpos[self.obj_body]
         grip = self.data.site_xpos[self.grip_site]
         dist = float(np.linalg.norm(obj - grip))
         lift = float(obj[2] - TABLE_TOP)
-        r = -0.4 * dist + 2.5 * max(0.0, lift - 0.02)
+        open_now = self._gripper_open()
+        around = self._around(obj, dist)
+        target_open = min(GRIPPER_MAX_OPEN, float(self.spec.w) + 0.005)
+        width_err = abs(open_now * GRIPPER_MAX_OPEN - target_open)
+        close_delta = max(0.0, self._open_prev - open_now)
+        r_grasp = around * (0.8 * (1.0 - np.tanh(width_err / 0.01)) + 1.2 * close_delta)
+        r_grasp -= (1.0 - around) * close_delta * 0.3
+        touch_fixed, touch_moving = self._jaw_contacts()
+        r_contact = 0.4 * touch_fixed + 0.4 * touch_moving
+        upright = float(self.data.xmat[self.obj_body].reshape(3, 3)[2, 2])
+        r_tilt = -0.5 * max(0.0, 0.5 - upright)
+        r = -0.4 * dist + 2.5 * max(0.0, lift - 0.02) + float(r_grasp) + r_contact + r_tilt
         success = lift > 0.08 and dist < 0.12
         if success:
             r += 4.0
         if obj[2] < 0.01:
             r -= 1.0
+        self._open_prev = open_now
         return r, success
 
     def step(self, action: np.ndarray) -> tuple[dict, float, bool, dict]:

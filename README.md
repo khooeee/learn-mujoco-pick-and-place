@@ -94,9 +94,15 @@ Those 6 values are mapped linearly onto each actuator’s `ctrlrange`. No IK: th
 **Reward** (after each policy step)
 
 ```
-r = -0.4 × ||object − gripper|| + 2.5 × max(0, lift − 2 cm)
+r = -0.4 × ||object − gripper||
+  + gated grasp (jaws around object, matching width, closing)
+  + 0.4 per jaw contact with the object
+  + 2.5 × max(0, lift − 2 cm)
   + 4.0 if lift > 8 cm and gripper still close
+  − 0.5 × tilt if the object is knocked past ~60°
   − 1.0 if the object falls through the table
 ```
+
+Closing the gripper only scores when the object is between the jaws (within ~5 cm of the TCP). Closing in free space is a small penalty.
 
 Success = object more than 8 cm above the table and within 12 cm of the gripper.

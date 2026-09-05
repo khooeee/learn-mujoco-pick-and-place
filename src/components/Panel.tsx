@@ -40,6 +40,16 @@ export function Panel() {
   const runs = useTwin((s) => s.runs);
   const runRows = [...runs].sort((a, b) => b.id.localeCompare(a.id));
   const selectedRun = runRows.find((r) => r.id === runId);
+  const [epWindow, setEpWindow] = useState<{ runId: string; from: number } | null>(null);
+  const epFrom =
+    epWindow && epWindow.runId === runId
+      ? epWindow.from
+      : episodes.length
+        ? Math.max(0, Math.max(...episodes.map((e) => e.index)) - 49)
+        : 0;
+  const epRows = [...episodes]
+    .sort((a, b) => a.index - b.index)
+    .filter((e) => e.index >= epFrom);
   const glbInput = useRef<HTMLInputElement>(null);
   const [importBusy, setImportBusy] = useState(false);
 
@@ -102,6 +112,18 @@ export function Panel() {
       window.clearInterval(id);
     };
   }, []);
+
+  useEffect(() => {
+    if (!runId || episodes.length === 0) {
+      setEpWindow(null);
+      return;
+    }
+    setEpWindow((w) => {
+      if (w && w.runId === runId) return w;
+      const maxIdx = Math.max(...episodes.map((e) => e.index));
+      return { runId, from: Math.max(0, maxIdx - 49) };
+    });
+  }, [runId, episodes]);
 
   const running = status?.state === "running" || status?.alive;
 
@@ -385,17 +407,15 @@ export function Panel() {
 
       <section>
         <h2>4. Episodes</h2>
-        <p className="hint">Episodes for the selected run. Render an mp4 (overhead | wrist).</p>
+        <p className="hint">
+          Latest 50 on load. New episodes append below so rows you are clicking stay put.
+        </p>
         {videoUrl && (
           <button onClick={() => useTwin.getState().setVideoUrl(null)}>Stop video</button>
         )}
         <div className="eps">
-          {episodes.length === 0 && <p className="hint">No episodes yet.</p>}
-          {episodes
-            .slice()
-            .reverse()
-            .slice(0, 80)
-            .map((e) => (
+          {epRows.length === 0 && <p className="hint">No episodes yet.</p>}
+          {epRows.map((e) => (
               <div className="ep" key={e.index}>
                 <span>
                   #{e.index} {e.success ? "lift" : "miss"} R {e.reward.toFixed(1)}

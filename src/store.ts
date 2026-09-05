@@ -63,7 +63,12 @@ export const useTwin = create<Store>((set) => ({
   },
   setRlOnline: (rlOnline) => set({ rlOnline }),
   setStatus: (status) => set({ status }),
-  setRunId: (runId) => set({ runId, followLive: true }),
+  setRunId: (runId) =>
+    set((s) =>
+      s.runId === runId
+        ? { runId, followLive: true }
+        : { runId, followLive: true, episodes: [], metrics: [], videoUrl: null },
+    ),
   setEpisodes: (episodes) => set({ episodes }),
   setMetrics: (metrics) => set({ metrics }),
   setVideoUrl: (videoUrl) =>
@@ -82,5 +87,6 @@ export const useTwin = create<Store>((set) => ({
         : { previewId: null, previewPrompt: null },
     ),
   setRuns: (runs) => set({ runs }),
-  selectRun: (runId, followLive = false) => set({ runId, followLive, videoUrl: null }),
+  selectRun: (runId, followLive = false) =>
+    set({ runId, followLive, videoUrl: null, episodes: [], metrics: [] }),
 }));

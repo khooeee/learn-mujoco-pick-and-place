@@ -1,36 +1,7 @@
 import { useEffect } from "react";
-import { generateBoxWithMint, generateObjectWithTripo } from "../lib/cloud";
+import { generateBoxWithMint } from "../lib/cloud";
 import { rl } from "../lib/rlApi";
 import { useTwin } from "../store";
-
-function PhotoField({
-  label,
-  hint,
-  value,
-  onChange,
-}: {
-  label: string;
-  hint: string;
-  value: string | null;
-  onChange: (url: string | null) => void;
-}) {
-  return (
-    <label className="field">
-      <span>{label}</span>
-      <p className="hint">{hint}</p>
-      <input
-        type="file"
-        accept="image/*"
-        onChange={(e) => {
-          const f = e.target.files?.[0];
-          if (!f) return;
-          onChange(URL.createObjectURL(f));
-        }}
-      />
-      {value && <img src={value} alt="" className="thumb" />}
-    </label>
-  );
-}
 
 function RateChart({ points }: { points: { episode: number; rate: number }[] }) {
   if (points.length < 2) return <p className="hint">Success curve appears after a few episodes.</p>;
@@ -52,7 +23,6 @@ function RateChart({ points }: { points: { episode: number; rate: number }[] }) 
 }
 
 export function Panel() {
-  const objectPhoto = useTwin((s) => s.objectPhoto);
   const logs = useTwin((s) => s.logs);
   const cloud = useTwin((s) => s.cloud);
   const rlOnline = useTwin((s) => s.rlOnline);
@@ -106,8 +76,7 @@ export function Panel() {
         <h1>TwinPick</h1>
         <p className="lede">
           Training is vision RL in MuJoCo on a real SO-101: cameras in, joints
-          out, lift reward. No IK. Replay any episode as an mp4. Optionally
-          import an object photo via Tripo.
+          out, lift reward. No IK. Replay any episode as an mp4.
         </p>
         <p className="metric">
           trainer {rlOnline ? "connected" : "offline — run python ml/server.py"}
@@ -116,26 +85,11 @@ export function Panel() {
 
       <section>
         <h2>1. Object (optional)</h2>
-        <PhotoField
-          label="Photo of an object"
-          hint="Tripo mesh for later mix. v1 train uses random boxes/cylinders."
-          value={objectPhoto}
-          onChange={(url) => {
-            useTwin.getState().setObjectPhoto(url);
-            useTwin.getState().log("Object photo loaded");
-          }}
-        />
         <p className="hint">
           {convexOn
-            ? "Convex is connected."
-            : "Train works without keys. For Tripo / Mint: npx convex dev."}
+            ? "Convex is connected. Mint can generate a box GLB (not used in v1 train yet)."
+            : "Train works without keys. For Mint: npx convex dev."}
         </p>
-        <div className="row">
-          <button disabled={!convexOn || !objectPhoto} onClick={() => void generateObjectWithTripo()}>
-            Make object · Tripo
-          </button>
-          <span className="status">{cloud.objectStatus}</span>
-        </div>
         <div className="row">
           <button disabled={!convexOn} onClick={() => void generateBoxWithMint()}>
             Make object · mint

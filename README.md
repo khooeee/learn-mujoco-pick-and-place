@@ -21,7 +21,7 @@ Open http://localhost:5173
 
 1. **Train** — headless PPO on MPS. Watch episode / success rate / log.
 2. **Episodes → render mp4** — waits, then plays in the stage.
-3. Optional: object photo → Tripo / Mint (Convex). v1 training still randomizes boxes and cylinders.
+3. Optional: Mint box GLB (Convex). v1 training still randomizes boxes and cylinders.
 
 CLI instead of the UI:
 

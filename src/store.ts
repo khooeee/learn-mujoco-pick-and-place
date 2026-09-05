@@ -5,12 +5,10 @@ type LogItem = { t: number; text: string };
 
 type Cloud = {
   objectGlbUrl?: string;
-  objectStatus: string;
   mintStatus: string;
 };
 
 type Store = {
-  objectPhoto: string | null;
   logs: LogItem[];
   cloud: Cloud;
   rlOnline: boolean;
@@ -21,7 +19,6 @@ type Store = {
   videoUrl: string | null;
   renderBusy: number | null;
   episodesTarget: number;
-  setObjectPhoto: (url: string | null) => void;
   log: (text: string) => void;
   setCloud: (patch: Partial<Cloud>) => void;
   setRlOnline: (v: boolean) => void;
@@ -35,10 +32,8 @@ type Store = {
 };
 
 export const useTwin = create<Store>((set) => ({
-  objectPhoto: null,
   logs: [],
   cloud: {
-    objectStatus: "idle",
     mintStatus: "idle",
   },
   rlOnline: false,
@@ -49,7 +44,6 @@ export const useTwin = create<Store>((set) => ({
   videoUrl: null,
   renderBusy: null,
   episodesTarget: 200,
-  setObjectPhoto: (url) => set({ objectPhoto: url }),
   log: (text) =>
     set((s) => ({
       logs: [{ t: Date.now(), text }, ...s.logs].slice(0, 24),

@@ -1,0 +1,10 @@
+node_modules
+dist
+.env
+.env.local
+.DS_Store
+convex/_generated/server*
+*.pyc
+__pycache__/
+.venv/
+notes.md

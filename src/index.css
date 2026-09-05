@@ -1,0 +1,158 @@
+:root {
+  font-family: "IBM Plex Sans", "Segoe UI", system-ui, sans-serif;
+  color: #f3ece4;
+  background: #0e0c0a;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  margin: 0;
+  height: 100%;
+}
+
+.app {
+  display: grid;
+  grid-template-columns: 1fr min(380px, 38vw);
+  height: 100%;
+}
+
+.stage {
+  min-width: 0;
+}
+
+.panel {
+  overflow: auto;
+  padding: 22px 20px 40px;
+  background: #1a1612;
+  border-left: 1px solid #3a3128;
+}
+
+.kicker {
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  font-size: 11px;
+  color: #e85d04;
+  margin: 0 0 6px;
+}
+
+h1 {
+  margin: 0 0 8px;
+  font-size: 28px;
+  font-weight: 650;
+}
+
+h2 {
+  margin: 0 0 8px;
+  font-size: 13px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #c9b8a6;
+}
+
+.lede,
+.hint {
+  color: #b7a89a;
+  font-size: 13px;
+  line-height: 1.45;
+  margin: 0 0 12px;
+}
+
+section {
+  margin-top: 22px;
+  padding-top: 16px;
+  border-top: 1px solid #3a3128;
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-bottom: 14px;
+  font-size: 13px;
+}
+
+.thumb {
+  width: 100%;
+  height: 88px;
+  object-fit: cover;
+  border-radius: 8px;
+  border: 1px solid #3a3128;
+}
+
+button {
+  appearance: none;
+  border: 1px solid #5a4a3a;
+  background: #241e19;
+  color: #f3ece4;
+  border-radius: 8px;
+  padding: 8px 10px;
+  font: inherit;
+  cursor: pointer;
+}
+
+button:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+button.primary {
+  background: #e85d04;
+  border-color: #e85d04;
+  color: #1a0e06;
+  font-weight: 650;
+}
+
+button.on {
+  border-color: #e85d04;
+  color: #ffd3b0;
+}
+
+.row {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  margin-bottom: 8px;
+}
+
+.row button {
+  flex: 1;
+}
+
+.status,
+.metric {
+  font-size: 12px;
+  color: #9a8b7c;
+}
+
+.marble {
+  color: #ffb347;
+  font-size: 13px;
+}
+
+.log {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  font-size: 12px;
+  color: #a89888;
+}
+
+.log li {
+  margin-bottom: 6px;
+}
+
+@media (max-width: 900px) {
+  .app {
+    grid-template-columns: 1fr;
+    grid-template-rows: 52vh 1fr;
+  }
+  .panel {
+    border-left: none;
+    border-top: 1px solid #3a3128;
+  }
+}

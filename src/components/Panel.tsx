@@ -345,7 +345,7 @@ export function Panel() {
         <h2>4. Episodes</h2>
         <p className="hint">Episodes for the selected run. Render an mp4 to watch it.</p>
         {videoUrl && (
-          <button onClick={() => useTwin.getState().setVideoUrl(null)}>Clear video</button>
+          <button onClick={() => useTwin.getState().setVideoUrl(null)}>Stop video</button>
         )}
         <div className="eps">
           {episodes.length === 0 && <p className="hint">No episodes yet.</p>}

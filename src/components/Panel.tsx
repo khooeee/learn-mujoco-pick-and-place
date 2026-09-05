@@ -1,5 +1,4 @@
 import { useEffect } from "react";
-import { generateBoxWithMint } from "../lib/cloud";
 import { rl } from "../lib/rlApi";
 import { useTwin } from "../store";
 
@@ -24,7 +23,6 @@ function RateChart({ points }: { points: { episode: number; rate: number }[] }) 
 
 export function Panel() {
   const logs = useTwin((s) => s.logs);
-  const cloud = useTwin((s) => s.cloud);
   const rlOnline = useTwin((s) => s.rlOnline);
   const status = useTwin((s) => s.status);
   const runId = useTwin((s) => s.runId);
@@ -33,7 +31,6 @@ export function Panel() {
   const renderBusy = useTwin((s) => s.renderBusy);
   const videoUrl = useTwin((s) => s.videoUrl);
   const episodesTarget = useTwin((s) => s.episodesTarget);
-  const convexOn = Boolean(import.meta.env.VITE_CONVEX_URL);
 
   useEffect(() => {
     let stop = false;
@@ -84,22 +81,7 @@ export function Panel() {
       </header>
 
       <section>
-        <h2>1. Object (optional)</h2>
-        <p className="hint">
-          {convexOn
-            ? "Convex is connected. Mint can generate a box GLB (not used in v1 train yet)."
-            : "Train works without keys. For Mint: npx convex dev."}
-        </p>
-        <div className="row">
-          <button disabled={!convexOn} onClick={() => void generateBoxWithMint()}>
-            Make object · mint
-          </button>
-          <span className="status">{cloud.mintStatus}</span>
-        </div>
-      </section>
-
-      <section>
-        <h2>2. Train (headless MuJoCo)</h2>
+        <h2>1. Train (headless MuJoCo)</h2>
         <label className="field">
           <span>Episodes</span>
           <input
@@ -166,7 +148,7 @@ export function Panel() {
       </section>
 
       <section>
-        <h2>3. Episodes</h2>
+        <h2>2. Episodes</h2>
         <p className="hint">Training stays headless. Click render, wait, then watch the mp4.</p>
         {videoUrl && (
           <button onClick={() => useTwin.getState().setVideoUrl(null)}>Clear video</button>

@@ -14,7 +14,6 @@
     "@react-three/fiber": "^9.7.0",
     "@react-three/rapier": "^2.2.0",
     "@sparkjsdev/spark": "^2.1.0",
-    "convex": "^1.45.0",
     "react": "^19.2.8",
     "react-dom": "^19.2.8",
     "three": "^0.180.0",

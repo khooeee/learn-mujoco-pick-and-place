@@ -3,14 +3,8 @@ import type { EpisodeRow, TrainStatus } from "./lib/rlApi";
 
 type LogItem = { t: number; text: string };
 
-type Cloud = {
-  objectGlbUrl?: string;
-  mintStatus: string;
-};
-
 type Store = {
   logs: LogItem[];
-  cloud: Cloud;
   rlOnline: boolean;
   status: TrainStatus | null;
   runId: string | null;
@@ -20,7 +14,6 @@ type Store = {
   renderBusy: number | null;
   episodesTarget: number;
   log: (text: string) => void;
-  setCloud: (patch: Partial<Cloud>) => void;
   setRlOnline: (v: boolean) => void;
   setStatus: (s: TrainStatus | null) => void;
   setRunId: (id: string | null) => void;
@@ -33,9 +26,6 @@ type Store = {
 
 export const useTwin = create<Store>((set) => ({
   logs: [],
-  cloud: {
-    mintStatus: "idle",
-  },
   rlOnline: false,
   status: null,
   runId: null,
@@ -48,7 +38,6 @@ export const useTwin = create<Store>((set) => ({
     set((s) => ({
       logs: [{ t: Date.now(), text }, ...s.logs].slice(0, 24),
     })),
-  setCloud: (patch) => set((s) => ({ cloud: { ...s.cloud, ...patch } })),
   setRlOnline: (rlOnline) => set({ rlOnline }),
   setStatus: (status) => set({ status }),
   setRunId: (runId) => set({ runId }),

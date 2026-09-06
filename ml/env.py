@@ -199,6 +199,8 @@ class PickEnv:
         mid = 0.5 * (self.ctrl_lo + self.ctrl_hi)
         self.data.ctrl[self.act_ids] = mid
         self.data.qpos[:6] = mid
+        self.data.ctrl[self.act_ids[5]] = self.ctrl_hi[5]
+        self.data.qpos[5] = self.ctrl_hi[5]
         self._place_object(spec)
         self._start_z = spec.z
         self._t = 0
@@ -371,9 +373,8 @@ class PickEnv:
         r_close = 0.0
         r_lift = 0.0
         if phase_reach:
-            r_reach = opened * (
-                REACH_K * (self._dist_prev - dist) + AROUND_K * (around - self._around_prev)
-            )
+            r_reach = REACH_K * (self._dist_prev - dist)
+            r_reach += opened * AROUND_K * (around - self._around_prev)
             r_reach -= (1.0 - opened) * close_delta * 0.3
         elif phase_close:
             r_close = GRASP_K * (grasp_q - self._grasp_prev)

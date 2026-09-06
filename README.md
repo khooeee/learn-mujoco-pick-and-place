@@ -94,10 +94,11 @@ Those 6 values are mapped linearly onto each actuator’s `ctrlrange`. No IK: th
 **Reward** (three gated phases; distances use the object AABB **center**, not the mesh origin)
 
 ```
-1. Reach (gripper must be open wider than the brick + 5 mm)
-   2.0 × Δ(3D gripper–object distance) + 0.8 × Δ(around)
+1. Reach (episode starts with the gripper fully open)
+   2.0 × Δ(3D gripper–object distance) always
+   + 0.8 × Δ(around) only while the gripper is wider than the brick + 5 mm
    − small penalty for closing in free space
-   Stage 1 latches when the center is between the open jaws (around ≥ 0.5)
+   Stage 1 latches when the center is between the **open** jaws (around ≥ 0.5)
 
 2. Close (only after stage 1; off again if the brick leaves the jaws)
    1.0 × Δ(around × squeeze) + 0.8 × Δ(jaw contact) + close-delta in the jaws

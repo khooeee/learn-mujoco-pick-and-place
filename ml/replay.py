@@ -27,6 +27,7 @@ def spec_from_row(row: dict) -> ObjectSpec:
         int(o["shape"]),
         rgba,  # type: ignore[arg-type]
         mesh_id=o.get("mesh_id"),
+        d=float(o.get("d") or o["w"]),
     )
 
 

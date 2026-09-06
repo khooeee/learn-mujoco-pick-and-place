@@ -45,6 +45,11 @@ class ObjectSpec:
     shape: int  # 0 box, 1 cylinder, 2 mint mesh
     rgba: tuple[float, float, float, float]
     mesh_id: str | None = None
+    d: float = 0.0
+
+    def __post_init__(self) -> None:
+        if self.d <= 0.0:
+            self.d = self.w
 
 
 class PickEnv:
@@ -63,6 +68,8 @@ class PickEnv:
         self.data = None  # type: ignore[assignment]
         self.spec = ObjectSpec(0.22, 0.0, 0.07, 0.056, 0.044, 0, (0.85, 0.38, 0.16, 1.0))
         self._start_z = TABLE_TOP
+        self._rest_center_z = TABLE_TOP
+        self._spawn_xy = (0.22, 0.0)
         self._open_prev = 0.5
         self._xy_prev = 0.0
         self._fixed_jaw_geoms: np.ndarray = np.zeros(0, dtype=np.int32)
@@ -157,8 +164,9 @@ class PickEnv:
         meta = load_meta(oid)
         h = float(meta.get("h") or 0.06)
         w = float(meta.get("w") or 0.05)
+        d = float(meta.get("d") or w)
         return ObjectSpec(
-            x, y, TABLE_TOP + 0.002, h, w, 2, (0.85, 0.38, 0.16, 1.0), mesh_id=oid
+            x, y, TABLE_TOP + 0.002, h, w, 2, (0.85, 0.38, 0.16, 1.0), mesh_id=oid, d=d
         )
 
     def reset(self, seed: int | None = None, spec: ObjectSpec | None = None) -> dict:
@@ -176,19 +184,35 @@ class PickEnv:
         for _ in range(20):
             mujoco.mj_step(self.model, self.data)
         self._open_prev = self._gripper_open()
-        obj = self.data.xpos[self.obj_body]
+        center = self._obj_center()
+        self._rest_center_z = float(center[2])
+        self._spawn_xy = (float(center[0]), float(center[1]))
         grip = self.data.site_xpos[self.grip_site]
-        self._xy_prev = float(np.hypot(obj[0] - grip[0], obj[1] - grip[1]))
+        self._xy_prev = float(np.hypot(center[0] - grip[0], center[1] - grip[1]))
         return self.observe()
 
     def _joints(self) -> np.ndarray:
         return self.data.qpos[:6].astype(np.float32)
 
     def _priv(self) -> np.ndarray:
-        pos = self.data.xpos[self.obj_body]
+        pos = self._obj_center()
         return np.array(
             [pos[0], pos[1], pos[2], self.spec.h, self.spec.w], dtype=np.float32
         )
+
+    def _obj_center(self) -> np.ndarray:
+        origin = self.data.xpos[self.obj_body]
+        rot = self.data.xmat[self.obj_body].reshape(3, 3)
+        local = np.array(
+            [0.5 * float(self.spec.w), 0.5 * float(self.spec.d), 0.5 * float(self.spec.h)]
+        )
+        return origin + rot @ local
+
+    def _obj_radius(self) -> float:
+        return 0.5 * max(float(self.spec.w), float(self.spec.h), float(self.spec.d))
+
+    def _obj_bottom_z(self) -> float:
+        return float(self._obj_center()[2] - self._obj_radius())
 
     def _render(self, cam: int | mujoco.MjvCamera) -> np.ndarray:
         assert self.renderer is not None
@@ -234,14 +258,6 @@ class PickEnv:
         tcp, rot = self._tcp_frame()
         local = rot.T @ (obj - tcp)
         near = self._band(dist, 0.03, AROUND_DIST)
-        lateral = self._band(float(local[1]), 0.025, 0.045)
-        x = float(local[0])
-        if -0.10 <= x <= 0.04:
-            depth = 1.0
-        elif -0.12 <= x <= 0.06:
-            depth = 0.5
-        else:
-            depth = 0.0
         between = 0.0
         if self._fixed_jaw_geoms.size and self._moving_jaw_geoms.size:
             z_f = float((rot.T @ (self.data.geom_xpos[int(self._fixed_jaw_geoms[0])] - tcp))[2])
@@ -252,7 +268,7 @@ class PickEnv:
                 between = 1.0
         else:
             between = self._band(float(local[2]), 0.03, 0.05)
-        return near * lateral * depth * between
+        return near * between
 
     def _jaw_contacts(self) -> tuple[float, float]:
         touch_fixed = 0.0
@@ -273,44 +289,33 @@ class PickEnv:
         return touch_fixed, touch_moving
 
     def _reward(self) -> tuple[float, bool]:
-        obj = self.data.xpos[self.obj_body]
+        obj = self._obj_center()
         grip = self.data.site_xpos[self.grip_site]
         dist = float(np.linalg.norm(obj - grip))
         xy = float(np.hypot(obj[0] - grip[0], obj[1] - grip[1]))
-        lift = float(obj[2] - TABLE_TOP)
+        lift = float(obj[2] - self._rest_center_z)
         open_now = self._gripper_open()
         around = self._around(obj, dist)
-        target_open = min(GRIPPER_MAX_OPEN, float(self.spec.w) + 0.005)
+        grasp_w = min(float(self.spec.w), float(self.spec.d))
+        target_open = min(GRIPPER_MAX_OPEN, grasp_w + 0.005)
         width_err = abs(open_now * GRIPPER_MAX_OPEN - target_open)
         close_delta = max(0.0, self._open_prev - open_now)
         r_grasp = around * (0.8 * (1.0 - np.tanh(width_err / 0.01)) + 1.2 * close_delta)
         r_grasp -= (1.0 - around) * close_delta * 0.3
         touch_fixed, touch_moving = self._jaw_contacts()
         pinch = touch_fixed * touch_moving
-        r_contact = 0.4 * touch_fixed + 0.4 * touch_moving + 1.5 * pinch
-        grasped = pinch > 0.0 or around > 0.5
-        r_lift = 2.5 * max(0.0, lift - 0.02) * (1.0 if grasped else 0.0)
-        upright = float(self.data.xmat[self.obj_body].reshape(3, 3)[2, 2])
-        r_tilt = -0.5 * max(0.0, 0.5 - upright)
-        knock_xy = float(np.hypot(obj[0] - self.spec.x, obj[1] - self.spec.y))
-        r_knock = -0.8 * max(0.0, knock_xy - 0.03) if lift < 0.03 else 0.0
-        r_xy = 1.2 * (self._xy_prev - xy)
+        r_contact = 0.05 * touch_fixed + 0.05 * touch_moving + 0.15 * pinch
+        r_lift = 4.0 * max(0.0, lift - 0.01) * pinch
+        knock_xy = float(np.hypot(obj[0] - self._spawn_xy[0], obj[1] - self._spawn_xy[1]))
+        r_knock = -0.4 * max(0.0, knock_xy - 0.08) if lift < 0.03 else 0.0
+        r_xy = 1.0 * (self._xy_prev - xy)
         above = float(grip[2] - obj[2])
         r_above = 0.2 * float(np.clip(above, 0.0, 0.08)) if xy > 0.04 else 0.0
-        r = (
-            r_xy
-            - 0.15 * dist
-            + r_above
-            + r_lift
-            + float(r_grasp)
-            + r_contact
-            + r_tilt
-            + r_knock
-        )
-        success = lift > 0.08 and dist < 0.12 and grasped
+        r = r_xy + r_above + r_lift + float(r_grasp) + r_contact + r_knock
+        success = lift > 0.08 and dist < 0.12 and pinch > 0.0
         if success:
-            r += 4.0
-        if obj[2] < 0.01:
+            r += 8.0
+        if self._obj_bottom_z() < 0.01:
             r -= 1.0
         self._open_prev = open_now
         self._xy_prev = xy
@@ -326,17 +331,18 @@ class PickEnv:
         r, success = self._reward()
         reward += r
         self._t += 1
-        obj = self.data.xpos[self.obj_body]
-        done = self._t >= self.max_actions or obj[2] < -0.02
+        center = self._obj_center()
+        done = self._t >= self.max_actions or self._obj_bottom_z() < -0.02
         info = {
             "success": bool(success),
-            "lifted_z": float(obj[2]),
+            "lifted_z": float(center[2]),
             "spec": {
                 "x": self.spec.x,
                 "y": self.spec.y,
                 "z": self.spec.z,
                 "h": self.spec.h,
                 "w": self.spec.w,
+                "d": self.spec.d,
                 "shape": self.spec.shape,
                 "rgba": list(self.spec.rgba),
                 "mesh_id": self.spec.mesh_id,

@@ -53,7 +53,7 @@ Code: `ml/nets.py` (networks), `ml/ppo.py` (PPO), `ml/env.py` (obs / reward). We
 | --- | --- | --- |
 | `img` | `6 × 84 × 84` | Overhead RGB stacked with a wrist-tracking RGB view, values in `[0, 1]` |
 | `joints` | `6` | `shoulder_pan`, `shoulder_lift`, `elbow_flex`, `wrist_flex`, `wrist_roll`, `gripper` |
-| `priv` | `5` | Object `x, y, z` plus height and width — **critic only**, not given to the actor |
+| `priv` | `5` | Object AABB-center `x, y, z` plus height and width — **critic only**, not given to the actor |
 
 One policy step is held for **8** MuJoCo steps (`action_repeat`). An episode is at most **80** policy steps.
 
@@ -91,21 +91,19 @@ Those 6 values are mapped linearly onto each actuator’s `ctrlrange`. No IK: th
 - Loss: `policy + 0.5 × value − 0.01 × entropy`
 - Update every **8** finished episodes (`--batch-episodes`)
 
-**Reward** (after each policy step)
+**Reward** (after each policy step; distances use the object AABB **center**, not the mesh origin)
 
 ```
-r = 1.2 × (previous XY error − current XY error)   # progress toward the object on the table
-  − 0.15 × ||object − gripper||                    # weak 3D reach
+r = 1.0 × (previous XY error − current XY error)   # progress toward the object
   + hover-above bonus while XY is still far
-  + gated grasp (jaws around object, matching width, closing)
-  + 0.4 per jaw contact + 1.5 if both jaws pinch
-  + 2.5 × max(0, lift − 2 cm)  only while grasped
-  + 4.0 if lift > 8 cm, gripper close, and grasped
-  − knock penalty if the object slides without lifting
-  − 0.5 × tilt if the object is knocked past ~60°
+  + gated grasp (center near TCP and between jaws, matching width, closing)
+  + 0.05 per jaw contact + 0.15 if both jaws pinch
+  + 4.0 × max(0, Δz − 1 cm)  only while both jaws pinch
+  + 8.0 if the center rose > 8 cm, still near the gripper, and pinching
+  − knock penalty only after ~8 cm of table slide without lift
   − 1.0 if the object falls through the table
 ```
 
-Closing the gripper only scores when the object is between the jaws (within ~5 cm of the TCP). Closing in free space is a small penalty. Lift is not paid for batting the object into the air.
+Lift is how far the center rose from the pose at reset. Closing scores when the center is between the jaws (within ~5 cm of the TCP); closing in free space is a small penalty. Tilt is not penalized (spheres have no upright). Pinch-on-the-table is a weak bonus so the policy cannot farm contact instead of lifting.
 
-Success = object more than 8 cm above the table, within 12 cm of the gripper, and actually grasped.
+Success = center more than 8 cm above its rest height, within 12 cm of the gripper, and both jaws in contact.

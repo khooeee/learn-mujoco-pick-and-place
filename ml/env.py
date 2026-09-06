@@ -33,9 +33,12 @@ GRIPPER_MAX_OPEN = 0.07  # meters at fully open (SO-101 hinge mapped linearly)
 AROUND_DIST = 0.05
 TABLE_CX, TABLE_CY = 0.22, 0.0
 TABLE_HX, TABLE_HY = 0.28, 0.20
-HOLD_STEPS = 5
+HOLD_STEPS = 16
 OBJ_LIN_MAX = 0.15
 OBJ_ANG_MAX = 2.0
+PINCH_EMA = 0.7
+PINCH_ON = 0.35
+LIFT_K = 12.0
 FIXED_JAW_MESH = "wrist_roll_follower_so101_v1"
 MOVING_JAW_MESH = "moving_jaw_so101_v1"
 
@@ -76,6 +79,8 @@ class PickEnv:
         self._rest_center_z = TABLE_TOP
         self._open_prev = 0.5
         self._xy_prev = 0.0
+        self._lift_prev = 0.0
+        self._pinch_ema = 0.0
         self._hold = 0
         self._fixed_jaw_geoms: np.ndarray = np.zeros(0, dtype=np.int32)
         self._moving_jaw_geoms: np.ndarray = np.zeros(0, dtype=np.int32)
@@ -193,6 +198,8 @@ class PickEnv:
         self._rest_center_z = float(center[2])
         grip = self.data.site_xpos[self.grip_site]
         self._xy_prev = float(np.hypot(center[0] - grip[0], center[1] - grip[1]))
+        self._lift_prev = 0.0
+        self._pinch_ema = 0.0
         self._hold = 0
         return self.observe()
 
@@ -269,6 +276,15 @@ class PickEnv:
         rot = self.data.site_xmat[self.grip_site].reshape(3, 3)
         return tcp, rot
 
+    def _jaw_axis_width(self) -> float:
+        _, rot = self._tcp_frame()
+        jaw = rot[:, 2]
+        body = self.data.xmat[self.obj_body].reshape(3, 3)
+        half = np.array(
+            [0.5 * float(self.spec.w), 0.5 * float(self.spec.d), 0.5 * float(self.spec.h)]
+        )
+        return float(2.0 * np.dot(np.abs(body.T @ jaw), half))
+
     def _around(self, obj: np.ndarray, dist: float) -> float:
         tcp, rot = self._tcp_frame()
         local = rot.T @ (obj - tcp)
@@ -322,23 +338,27 @@ class PickEnv:
         open_now = self._gripper_open()
         open_m = open_now * GRIPPER_MAX_OPEN
         around = self._around(obj, dist)
-        grasp_w = min(float(self.spec.w), float(self.spec.d))
+        grasp_w = self._jaw_axis_width()
         close_delta = max(0.0, self._open_prev - open_now)
         squeeze = self._squeeze(open_m, grasp_w)
         r_grasp = around * (0.8 * squeeze + 0.4 * close_delta)
         r_grasp -= (1.0 - around) * close_delta * 0.3
         touch_fixed, touch_moving = self._jaw_contacts()
         pinch = touch_fixed * touch_moving
+        self._pinch_ema = PINCH_EMA * self._pinch_ema + (1.0 - PINCH_EMA) * pinch
+        grasped = float(self._pinch_ema >= PINCH_ON)
         r_contact = 0.05 * touch_fixed + 0.05 * touch_moving + 0.15 * pinch
-        carry = max(pinch, self._band(dist, 0.06, 0.14))
-        r_lift = 4.0 * max(0.0, lift - 0.01) * carry
-        r_xy = 0.6 * (self._xy_prev - xy)
+        r_lift = LIFT_K * (lift - self._lift_prev) * grasped
+        approach = 1.0 - around
+        r_xy = 0.6 * (self._xy_prev - xy) * approach
         above = float(grip[2] - obj[2])
-        r_above = 0.2 * float(np.clip(above, 0.0, 0.08)) if xy > 0.04 else 0.0
+        r_above = (
+            0.2 * float(np.clip(above, 0.0, 0.08)) * approach if xy > 0.04 else 0.0
+        )
         r_off = -2.0 * self._off_table(obj)
         lin, ang = self._obj_speeds()
         holding = (
-            pinch > 0.0
+            grasped > 0.0
             and lift > 0.08
             and dist < 0.12
             and lin < OBJ_LIN_MAX
@@ -354,6 +374,7 @@ class PickEnv:
             r -= 1.0
         self._open_prev = open_now
         self._xy_prev = xy
+        self._lift_prev = lift
         return r, success
 
     def step(self, action: np.ndarray) -> tuple[dict, float, bool, dict]:

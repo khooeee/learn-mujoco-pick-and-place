@@ -94,19 +94,19 @@ Those 6 values are mapped linearly onto each actuator’s `ctrlrange`. No IK: th
 **Reward** (after each policy step; distances use the object AABB **center**, not the mesh origin)
 
 ```
-r = 0.6 × XY progress toward the object (always; rolling is allowed)
-  + hover-above bonus while XY is still far
+r = 0.6 × XY progress toward the object, faded out once the center is in the jaws
+  + hover-above bonus while XY is still far (same fade)
   + gated grasp (center near TCP and between jaws): squeeze opening
-      below ~0.85 × object width, plus a small close-delta
-  + 0.05 per jaw contact + 0.15 if both jaws pinch  (bonus, not a lift gate)
-  + 4.0 × max(0, Δz − 1 cm)  while pinched or within ~6–14 cm of the gripper
-  + hold progress (up to 0.4) while pinch + lift + near + low object speed
-  + 8.0 once that hold has lasted 5 policy steps
+      below ~0.85 × AABB width along the jaw axis, plus a small close-delta
+  + 0.05 per jaw contact + 0.15 if both jaws pinch
+  + 12 × Δz  only while dual-jaw contact EMA is on  (raise, not linger)
+  + hold progress (up to 0.4) while grasped + lift + near + low object speed
+  + 8.0 once that hold has lasted 16 policy steps
   − 2.0 × how far the center is past the table edge  (on-table slides are free)
   − 1.0 if the object falls through the table
   − small penalty for closing in free space
 ```
 
-Lift is how far the center rose from the pose at reset. A sphere may roll; the policy is still shaped toward the live object, not back to spawn. Grasp scores **squeeze** (aperture under the object width), not matching width + 5 mm. Lift credit does not require a dual-jaw pinch, but it does require the object to stay near the gripper so a flick across the table does not count. Pinch is a weak bonus. Tilt is not penalized (spheres have no upright).
+Lift is how far the center rose from the pose at reset. Approach shaping stops in the jaw volume so pushing the brick around is not a late-episode farm. Grasp width is the object's AABB projected onto the jaw-opening axis, not `min(w, d)` from import. Lift credit requires a dual-jaw pinch (EMA 0.7, threshold 0.35) so stud chatter does not drop the hold, but a flick that never pinches does not count. Tilt is not penalized.
 
-Success = pinch, center more than 8 cm above rest, within 12 cm of the gripper, object slower than 0.15 m/s and 2 rad/s, **held for 5 policy steps**. A one-frame fling does not count. Changing this reward means **Train New**, not Resume.
+Success = grasped (pinch EMA), center more than 8 cm above rest, within 12 cm of the gripper, object slower than 0.15 m/s and 2 rad/s, **held for 16 policy steps**. Changing this reward means **Train New**, not Resume.

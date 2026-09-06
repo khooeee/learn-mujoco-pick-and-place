@@ -38,7 +38,7 @@ export function Panel() {
   const selectedId = useTwin((s) => s.selectedId);
   const previewId = useTwin((s) => s.previewId);
   const runs = useTwin((s) => s.runs);
-  const runRows = [...runs].sort((a, b) => b.id.localeCompare(a.id));
+  const runRows = [...runs].sort((a, b) => b.mtime - a.mtime || b.id.localeCompare(a.id));
   const selectedRun = runRows.find((r) => r.id === runId);
   const [epWindow, setEpWindow] = useState<{ runId: string; from: number } | null>(null);
   const [epFilter, setEpFilter] = useState<"latest" | "all" | "viewable">("latest");
@@ -91,7 +91,7 @@ export function Panel() {
         s.setObjects(objs.items, objs.selected);
         s.setStatus(st);
         s.setRuns(runList);
-        const sorted = [...runList].sort((a, b) => b.id.localeCompare(a.id));
+        const sorted = [...runList].sort((a, b) => b.mtime - a.mtime || b.id.localeCompare(a.id));
         const live = Boolean((st.state === "running" || st.alive) && st.run_id);
         const current = useTwin.getState().runId;
         if (live && (s.followLive || !current)) {
@@ -337,7 +337,7 @@ export function Panel() {
       </section>
 
       <section>
-        <h2>3. Train (headless MuJoCo)</h2>
+        <h2>3. Train</h2>
         <label className="field">
           <span>Episodes</span>
           <input
@@ -387,8 +387,24 @@ export function Panel() {
                 const s = useTwin.getState();
                 try {
                   const out = (await rl.start(s.episodesTarget)) as { run_id: string };
+                  const now = Date.now() / 1000;
                   s.setRunId(out.run_id);
                   s.setVideoUrl(null);
+                  s.setRuns([
+                    {
+                      id: out.run_id,
+                      state: "running",
+                      episode: 0,
+                      episodes_target: s.episodesTarget,
+                      success_rate: 0,
+                      reward: 0,
+                      episodes: 0,
+                      videos: 0,
+                      has_policy: false,
+                      mtime: now,
+                    },
+                    ...s.runs.filter((r) => r.id !== out.run_id),
+                  ]);
                   s.log(`Training ${out.run_id}`);
                 } catch (e) {
                   s.log(e instanceof Error ? e.message : "start failed");

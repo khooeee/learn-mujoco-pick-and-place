@@ -66,7 +66,7 @@ def _latest_run() -> Path | None:
     if not RUNS.exists():
         return None
     dirs = [p for p in RUNS.iterdir() if p.is_dir()]
-    return max(dirs, key=lambda p: p.name) if dirs else None
+    return max(dirs, key=lambda p: p.stat().st_mtime) if dirs else None
 
 
 def _safe_run(run_id: str) -> Path:
@@ -237,7 +237,7 @@ def runs():
     if not RUNS.exists():
         return []
     out = []
-    for p in sorted(RUNS.iterdir(), key=lambda x: x.name, reverse=True):
+    for p in sorted(RUNS.iterdir(), key=lambda x: x.stat().st_mtime, reverse=True):
         if not p.is_dir():
             continue
         st = read_json(p / "status.json") if (p / "status.json").exists() else {}

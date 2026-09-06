@@ -44,7 +44,7 @@ _mint: dict = {"busy": False, "prompt": "", "error": None, "last": None}
 
 
 class TrainReq(BaseModel):
-    episodes: int = 1000
+    episodes: int = 30000
     seed: int = 0
     resume: bool = False
     run_id: str | None = None

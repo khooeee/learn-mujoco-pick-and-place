@@ -47,7 +47,7 @@ export const useTwin = create<Store>((set) => ({
   metrics: [],
   videoUrl: null,
   renderBusy: null,
-  episodesTarget: 1000,
+  episodesTarget: 30000,
   mintPrompt: "small ceramic mug",
   mintBusy: false,
   mintJobPrompt: "",

@@ -345,9 +345,9 @@ export function Panel() {
           <input
             type="number"
             min={2}
-            max={20000}
+            max={100000}
             value={episodesTarget}
-            onChange={(e) => useTwin.getState().setEpisodesTarget(Number(e.target.value) || 1000)}
+            onChange={(e) => useTwin.getState().setEpisodesTarget(Number(e.target.value) || 30000)}
           />
         </label>
         <div className="row">

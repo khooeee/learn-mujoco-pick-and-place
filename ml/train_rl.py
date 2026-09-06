@@ -4,7 +4,6 @@
 from __future__ import annotations
 
 import argparse
-import time
 from collections import deque
 from pathlib import Path
 
@@ -12,7 +11,7 @@ import numpy as np
 import torch
 
 from env import PickEnv
-from log import append_jsonl, write_json
+from log import append_jsonl, new_run_id, write_json
 from ppo import PPO, gae
 
 ROOT = Path(__file__).resolve().parent
@@ -102,7 +101,7 @@ def main() -> None:
     ap.add_argument("--batch-episodes", type=int, default=8)
     args = ap.parse_args()
 
-    run_id = args.run or time.strftime("run-%Y%m%d-%H%M%S")
+    run_id = args.run or new_run_id()
     run_dir = RUNS / run_id
     run_dir.mkdir(parents=True, exist_ok=True)
     dev = device()

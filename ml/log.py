@@ -1,8 +1,31 @@
 from __future__ import annotations
 
 import json
+import subprocess
+import time
 from pathlib import Path
 from typing import Any
+
+REPO = Path(__file__).resolve().parent.parent
+
+
+def git_sha(short: int = 7) -> str:
+    try:
+        out = subprocess.check_output(
+            ["git", "rev-parse", f"--short={short}", "HEAD"],
+            cwd=REPO,
+            stderr=subprocess.DEVNULL,
+            text=True,
+        )
+        return out.strip()
+    except (OSError, subprocess.CalledProcessError):
+        return ""
+
+
+def new_run_id() -> str:
+    stamp = time.strftime("%Y%m%d-%H%M%S")
+    sha = git_sha()
+    return f"{stamp}-{sha}" if sha else stamp
 
 
 def append_jsonl(path: Path, row: dict[str, Any]) -> None:

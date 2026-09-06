@@ -9,7 +9,6 @@ import signal
 import subprocess
 import sys
 import threading
-import time
 from pathlib import Path
 
 from fastapi import FastAPI, File, Form, HTTPException, UploadFile
@@ -17,7 +16,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from pydantic import BaseModel
 
-from log import read_json, read_jsonl
+from log import new_run_id, read_json, read_jsonl
 from library import glb_path, import_glb, list_objects, object_dir, selected_id, set_selected, stl_path
 from mint import api_key, generate_from_prompt, load_dotenv
 from replay import render_episode
@@ -180,7 +179,7 @@ def train_start(req: TrainReq):
         if current >= episodes:
             episodes = current + req.episodes
     else:
-        run_id = time.strftime("run-%Y%m%d-%H%M%S")
+        run_id = new_run_id()
         resume = ""
     _run_id = run_id
     (RUNS / run_id).mkdir(parents=True, exist_ok=True)

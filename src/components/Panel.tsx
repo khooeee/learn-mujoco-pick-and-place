@@ -289,7 +289,6 @@ export function Panel() {
                   <th>Ep</th>
                   <th>Success</th>
                   <th>Videos</th>
-                  <th>Ckpt</th>
                   <th></th>
                 </tr>
               </thead>
@@ -316,7 +315,6 @@ export function Panel() {
                     </td>
                     <td>{(r.success_rate * 100).toFixed(0)}%</td>
                     <td>{r.videos}</td>
-                    <td>{r.has_policy ? "yes" : "—"}</td>
                     <td>
                       <button
                         disabled={!rlOnline}

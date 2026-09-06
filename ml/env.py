@@ -41,6 +41,8 @@ PINCH_ON = 0.35
 LIFT_K = 12.0
 GRASP_K = 1.0
 CONTACT_K = 0.8
+REACH_K = 2.0
+AROUND_K = 0.8
 FIXED_JAW_MESH = "wrist_roll_follower_so101_v1"
 MOVING_JAW_MESH = "moving_jaw_so101_v1"
 
@@ -80,7 +82,8 @@ class PickEnv:
         self._start_z = TABLE_TOP
         self._rest_center_z = TABLE_TOP
         self._open_prev = 0.5
-        self._xy_prev = 0.0
+        self._dist_prev = 0.0
+        self._around_prev = 0.0
         self._lift_prev = 0.0
         self._grasp_prev = 0.0
         self._contact_prev = 0.0
@@ -201,7 +204,8 @@ class PickEnv:
         center = self._obj_center()
         self._rest_center_z = float(center[2])
         grip = self.data.site_xpos[self.grip_site]
-        self._xy_prev = float(np.hypot(center[0] - grip[0], center[1] - grip[1]))
+        self._dist_prev = float(np.linalg.norm(center - grip))
+        self._around_prev = 0.0
         self._lift_prev = 0.0
         self._grasp_prev = 0.0
         self._contact_prev = 0.0
@@ -339,7 +343,6 @@ class PickEnv:
         obj = self._obj_center()
         grip = self.data.site_xpos[self.grip_site]
         dist = float(np.linalg.norm(obj - grip))
-        xy = float(np.hypot(obj[0] - grip[0], obj[1] - grip[1]))
         lift = float(obj[2] - self._rest_center_z)
         open_now = self._gripper_open()
         open_m = open_now * GRIPPER_MAX_OPEN
@@ -359,11 +362,8 @@ class PickEnv:
         r_contact = CONTACT_K * (contact_q - self._contact_prev)
         r_lift = LIFT_K * (lift - self._lift_prev) * grasped
         approach = 1.0 - around
-        r_xy = 0.6 * (self._xy_prev - xy) * approach
-        above = float(grip[2] - obj[2])
-        r_above = (
-            0.2 * float(np.clip(above, 0.0, 0.08)) * approach if xy > 0.04 else 0.0
-        )
+        r_reach = REACH_K * (self._dist_prev - dist) * approach
+        r_around = AROUND_K * (around - self._around_prev)
         r_off = -2.0 * self._off_table(obj)
         lin, ang = self._obj_speeds()
         holding = (
@@ -375,14 +375,15 @@ class PickEnv:
         )
         self._hold = self._hold + 1 if holding else 0
         r_hold = 0.4 * (self._hold / HOLD_STEPS) if holding else 0.0
-        r = r_xy + r_above + r_lift + float(r_grasp) + r_contact + r_off + r_hold
+        r = r_reach + r_around + r_lift + float(r_grasp) + r_contact + r_off + r_hold
         success = self._hold >= HOLD_STEPS
         if success:
             r += 8.0
         if self._obj_bottom_z() < 0.01:
             r -= 1.0
         self._open_prev = open_now
-        self._xy_prev = xy
+        self._dist_prev = dist
+        self._around_prev = around
         self._lift_prev = lift
         self._grasp_prev = grasp_q
         self._contact_prev = contact_q

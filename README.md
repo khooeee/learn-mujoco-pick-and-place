@@ -94,9 +94,9 @@ Those 6 values are mapped linearly onto each actuator’s `ctrlrange`. No IK: th
 **Reward** (after each policy step; distances use the object AABB **center**, not the mesh origin)
 
 ```
-r = 0.6 × XY progress toward the object, faded out once the center is in the jaws
-  + hover-above bonus while XY is still far (same fade)
-  + 1.0 × Δ(around × squeeze)  (establish a grasp, not linger in one)
+r = 2.0 × Δ(3D gripper–object distance), faded out once the center is in the jaws
+  + 0.8 × Δ(around)  (center near TCP and between the jaws — once, not linger)
+  + 1.0 × Δ(around × squeeze)
       + small close-delta while in the jaws, − small close-delta in free space
   + 0.8 × Δ(jaw-contact quality)  (0.5 per jaw; pinch = 1.0)
   + 12 × Δz  only while dual-jaw contact EMA is on  (raise, not linger)
@@ -106,6 +106,6 @@ r = 0.6 × XY progress toward the object, faded out once the center is in the ja
   − 1.0 if the object falls through the table
 ```
 
-Lift is how far the center rose from the pose at reset. Approach shaping stops in the jaw volume so pushing the brick around is not a late-episode farm. Grasp width is the object's AABB projected onto the jaw-opening axis, not `min(w, d)` from import. Squeeze and contact are potentials like lift: entering a pinch is worth about +1.8 once; sitting on the table with jaws closed is worth ~0 after that. An 8 cm pinched lift is ~1.0 plus the +8 success bonus. Lift credit requires a dual-jaw pinch (EMA 0.7, threshold 0.35) so stud chatter does not drop the hold, but a flick that never pinches does not count. Tilt is not penalized.
+Lift is how far the center rose from the pose at reset. Reach is 3D, so descending into the jaws is paid; there is no per-step hover-above bonus (that plateaued at R ≈ 1.1 with the brick still on the table). Grasp width is the object's AABB projected onto the jaw-opening axis. Squeeze, contact, around, and lift are all potentials: sitting still scores ~0 after you arrive. An 8 cm pinched lift plus success is about +9. Lift credit requires a dual-jaw pinch (EMA 0.7, threshold 0.35). Tilt is not penalized.
 
 Success = grasped (pinch EMA), center more than 8 cm above rest, within 12 cm of the gripper, object slower than 0.15 m/s and 2 rad/s, **held for 16 policy steps**. Changing this reward means **Train New**, not Resume.

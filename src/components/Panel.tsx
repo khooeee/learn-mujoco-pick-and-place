@@ -2,25 +2,6 @@ import { useEffect, useRef, useState } from "react";
 import { rl } from "../lib/rlApi";
 import { useTwin } from "../store";
 
-function RateChart({ points }: { points: { episode: number; rate: number }[] }) {
-  if (points.length < 2) return <p className="hint">Success curve appears after a few episodes.</p>;
-  const w = 320;
-  const h = 72;
-  const maxX = Math.max(...points.map((p) => p.episode), 1);
-  const d = points
-    .map((p, i) => {
-      const x = (p.episode / maxX) * w;
-      const y = h - p.rate * (h - 6) - 3;
-      return `${i === 0 ? "M" : "L"}${x.toFixed(1)},${y.toFixed(1)}`;
-    })
-    .join(" ");
-  return (
-    <svg className="chart" viewBox={`0 0 ${w} ${h}`} width="100%" height="72">
-      <path d={d} fill="none" stroke="#e85d04" strokeWidth="2" />
-    </svg>
-  );
-}
-
 type PhasePt = {
   episode: number;
   r_reach?: number;
@@ -472,7 +453,6 @@ export function Panel() {
             {(status.r_lift ?? 0).toFixed(2)}
           </p>
         )}
-        <RateChart points={metrics} />
         <RewardChart points={metrics} />
         <pre className="logtail">{(status?.log_tail ?? []).slice(-12).join("\n") || " "}</pre>
       </section>

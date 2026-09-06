@@ -31,6 +31,11 @@ TABLE_TOP = 0.04
 IMG = 84
 GRIPPER_MAX_OPEN = 0.07  # meters at fully open (SO-101 hinge mapped linearly)
 AROUND_DIST = 0.05
+KNOCK_START = 0.02
+KNOCK_COEF = 2.0
+HOLD_STEPS = 5
+OBJ_LIN_MAX = 0.15
+OBJ_ANG_MAX = 2.0
 FIXED_JAW_MESH = "wrist_roll_follower_so101_v1"
 MOVING_JAW_MESH = "moving_jaw_so101_v1"
 
@@ -72,6 +77,8 @@ class PickEnv:
         self._spawn_xy = (0.22, 0.0)
         self._open_prev = 0.5
         self._xy_prev = 0.0
+        self._grip_spawn_xy_prev = 0.0
+        self._hold = 0
         self._fixed_jaw_geoms: np.ndarray = np.zeros(0, dtype=np.int32)
         self._moving_jaw_geoms: np.ndarray = np.zeros(0, dtype=np.int32)
         self._load_scene(None)
@@ -189,6 +196,10 @@ class PickEnv:
         self._spawn_xy = (float(center[0]), float(center[1]))
         grip = self.data.site_xpos[self.grip_site]
         self._xy_prev = float(np.hypot(center[0] - grip[0], center[1] - grip[1]))
+        self._grip_spawn_xy_prev = float(
+            np.hypot(grip[0] - self._spawn_xy[0], grip[1] - self._spawn_xy[1])
+        )
+        self._hold = 0
         return self.observe()
 
     def _joints(self) -> np.ndarray:
@@ -288,12 +299,18 @@ class PickEnv:
                 touch_moving = 1.0
         return touch_fixed, touch_moving
 
+    def _obj_speeds(self) -> tuple[float, float]:
+        lin = float(np.linalg.norm(self.data.qvel[-6:-3]))
+        ang = float(np.linalg.norm(self.data.qvel[-3:]))
+        return lin, ang
+
     def _reward(self) -> tuple[float, bool]:
         obj = self._obj_center()
         grip = self.data.site_xpos[self.grip_site]
         dist = float(np.linalg.norm(obj - grip))
         xy = float(np.hypot(obj[0] - grip[0], obj[1] - grip[1]))
         lift = float(obj[2] - self._rest_center_z)
+        on_table = lift < 0.03
         open_now = self._gripper_open()
         around = self._around(obj, dist)
         grasp_w = min(float(self.spec.w), float(self.spec.d))
@@ -307,18 +324,36 @@ class PickEnv:
         r_contact = 0.05 * touch_fixed + 0.05 * touch_moving + 0.15 * pinch
         r_lift = 4.0 * max(0.0, lift - 0.01) * pinch
         knock_xy = float(np.hypot(obj[0] - self._spawn_xy[0], obj[1] - self._spawn_xy[1]))
-        r_knock = -0.4 * max(0.0, knock_xy - 0.08) if lift < 0.03 else 0.0
-        r_xy = 1.0 * (self._xy_prev - xy)
+        displaced = knock_xy > KNOCK_START
+        r_knock = -KNOCK_COEF * max(0.0, knock_xy - KNOCK_START) if on_table else 0.0
+        grip_spawn_xy = float(
+            np.hypot(grip[0] - self._spawn_xy[0], grip[1] - self._spawn_xy[1])
+        )
+        if on_table and displaced:
+            r_xy = 0.3 * (self._grip_spawn_xy_prev - grip_spawn_xy)
+        else:
+            r_xy = 1.0 * (self._xy_prev - xy)
         above = float(grip[2] - obj[2])
         r_above = 0.2 * float(np.clip(above, 0.0, 0.08)) if xy > 0.04 else 0.0
-        r = r_xy + r_above + r_lift + float(r_grasp) + r_contact + r_knock
-        success = lift > 0.08 and dist < 0.12 and pinch > 0.0
+        lin, ang = self._obj_speeds()
+        holding = (
+            pinch > 0.0
+            and lift > 0.08
+            and dist < 0.12
+            and lin < OBJ_LIN_MAX
+            and ang < OBJ_ANG_MAX
+        )
+        self._hold = self._hold + 1 if holding else 0
+        r_hold = 0.4 * (self._hold / HOLD_STEPS) if holding else 0.0
+        r = r_xy + r_above + r_lift + float(r_grasp) + r_contact + r_knock + r_hold
+        success = self._hold >= HOLD_STEPS
         if success:
             r += 8.0
         if self._obj_bottom_z() < 0.01:
             r -= 1.0
         self._open_prev = open_now
         self._xy_prev = xy
+        self._grip_spawn_xy_prev = grip_spawn_xy
         return r, success
 
     def step(self, action: np.ndarray) -> tuple[dict, float, bool, dict]:

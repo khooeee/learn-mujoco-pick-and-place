@@ -94,16 +94,18 @@ Those 6 values are mapped linearly onto each actuator’s `ctrlrange`. No IK: th
 **Reward** (after each policy step; distances use the object AABB **center**, not the mesh origin)
 
 ```
-r = 1.0 × (previous XY error − current XY error)   # progress toward the object
+r = XY progress toward the object, unless it has slid > 2 cm on the table
+      (then 0.3 × progress of the gripper toward spawn XY — do not chase a roll)
   + hover-above bonus while XY is still far
   + gated grasp (center near TCP and between jaws, matching width, closing)
   + 0.05 per jaw contact + 0.15 if both jaws pinch
   + 4.0 × max(0, Δz − 1 cm)  only while both jaws pinch
-  + 8.0 if the center rose > 8 cm, still near the gripper, and pinching
-  − knock penalty only after ~8 cm of table slide without lift
+  + hold progress (up to 0.4) while pinch + lift + near + low object speed
+  + 8.0 once that hold has lasted 5 policy steps
+  − 2.0 × (table slide − 2 cm) while not lifted  (starts at 2 cm, not 8 cm)
   − 1.0 if the object falls through the table
 ```
 
 Lift is how far the center rose from the pose at reset. Closing scores when the center is between the jaws (within ~5 cm of the TCP); closing in free space is a small penalty. Tilt is not penalized (spheres have no upright). Pinch-on-the-table is a weak bonus so the policy cannot farm contact instead of lifting.
 
-Success = center more than 8 cm above its rest height, within 12 cm of the gripper, and both jaws in contact.
+Success = pinch, center more than 8 cm above rest, within 12 cm of the gripper, object slower than 0.15 m/s and 2 rad/s, **held for 5 policy steps**. A one-frame fling does not count. Changing this reward means **Train New**, not Resume.

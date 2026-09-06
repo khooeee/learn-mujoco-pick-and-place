@@ -39,6 +39,8 @@ OBJ_ANG_MAX = 2.0
 PINCH_EMA = 0.7
 PINCH_ON = 0.35
 LIFT_K = 12.0
+GRASP_K = 1.0
+CONTACT_K = 0.8
 FIXED_JAW_MESH = "wrist_roll_follower_so101_v1"
 MOVING_JAW_MESH = "moving_jaw_so101_v1"
 
@@ -80,6 +82,8 @@ class PickEnv:
         self._open_prev = 0.5
         self._xy_prev = 0.0
         self._lift_prev = 0.0
+        self._grasp_prev = 0.0
+        self._contact_prev = 0.0
         self._pinch_ema = 0.0
         self._hold = 0
         self._fixed_jaw_geoms: np.ndarray = np.zeros(0, dtype=np.int32)
@@ -199,6 +203,8 @@ class PickEnv:
         grip = self.data.site_xpos[self.grip_site]
         self._xy_prev = float(np.hypot(center[0] - grip[0], center[1] - grip[1]))
         self._lift_prev = 0.0
+        self._grasp_prev = 0.0
+        self._contact_prev = 0.0
         self._pinch_ema = 0.0
         self._hold = 0
         return self.observe()
@@ -341,13 +347,16 @@ class PickEnv:
         grasp_w = self._jaw_axis_width()
         close_delta = max(0.0, self._open_prev - open_now)
         squeeze = self._squeeze(open_m, grasp_w)
-        r_grasp = around * (0.8 * squeeze + 0.4 * close_delta)
+        grasp_q = around * squeeze
+        r_grasp = GRASP_K * (grasp_q - self._grasp_prev)
+        r_grasp += around * 0.4 * close_delta
         r_grasp -= (1.0 - around) * close_delta * 0.3
         touch_fixed, touch_moving = self._jaw_contacts()
         pinch = touch_fixed * touch_moving
         self._pinch_ema = PINCH_EMA * self._pinch_ema + (1.0 - PINCH_EMA) * pinch
         grasped = float(self._pinch_ema >= PINCH_ON)
-        r_contact = 0.05 * touch_fixed + 0.05 * touch_moving + 0.15 * pinch
+        contact_q = 0.5 * touch_fixed + 0.5 * touch_moving
+        r_contact = CONTACT_K * (contact_q - self._contact_prev)
         r_lift = LIFT_K * (lift - self._lift_prev) * grasped
         approach = 1.0 - around
         r_xy = 0.6 * (self._xy_prev - xy) * approach
@@ -375,6 +384,8 @@ class PickEnv:
         self._open_prev = open_now
         self._xy_prev = xy
         self._lift_prev = lift
+        self._grasp_prev = grasp_q
+        self._contact_prev = contact_q
         return r, success
 
     def step(self, action: np.ndarray) -> tuple[dict, float, bool, dict]:

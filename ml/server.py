@@ -100,6 +100,9 @@ def _status_from_disk() -> dict:
             "episodes_target": 0,
             "success_rate": 0.0,
             "reward": 0.0,
+            "r_reach": 0.0,
+            "r_close": 0.0,
+            "r_lift": 0.0,
             "log": "idle",
             "alive": bool(_proc and _proc.poll() is None),
         }
@@ -283,6 +286,9 @@ def episodes(run_id: str):
             "index": r.get("index"),
             "success": r.get("success"),
             "reward": r.get("reward"),
+            "r_reach": 0.0 if r.get("r_reach") is None else float(r["r_reach"]),
+            "r_close": 0.0 if r.get("r_close") is None else float(r["r_close"]),
+            "r_lift": 0.0 if r.get("r_lift") is None else float(r["r_lift"]),
             "lifted_z": r.get("lifted_z"),
             "has_video": (RUNS / run_id / "videos" / f"ep_{r.get('index')}.mp4").exists(),
         }

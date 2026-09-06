@@ -6,7 +6,7 @@ type Store = {
   status: TrainStatus | null;
   runId: string | null;
   episodes: EpisodeRow[];
-  metrics: { episode: number; rate: number; reward: number }[];
+  metrics: { episode: number; rate: number; reward: number; r_reach?: number; r_close?: number; r_lift?: number }[];
   videoUrl: string | null;
   renderBusy: number | null;
   episodesTarget: number;

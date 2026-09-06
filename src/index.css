@@ -63,6 +63,25 @@ body,
   margin: 8px 0;
 }
 
+.chart-legend {
+  display: flex;
+  gap: 12px;
+  font-size: 11px;
+  color: #9a8b7c;
+  margin: 0 0 8px;
+}
+.chart-legend span {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+.chart-legend i {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  display: inline-block;
+}
+
 .logtail {
   font-size: 11px;
   line-height: 1.35;

@@ -34,6 +34,9 @@ def rollout_episode(env: PickEnv, ppo: PPO, seed: int, deterministic: bool = Fal
     actions_log = []
     success = False
     total = 0.0
+    r_reach = 0.0
+    r_close = 0.0
+    r_lift = 0.0
     lifted = 0.0
     spec = None
     done = False
@@ -50,6 +53,9 @@ def rollout_episode(env: PickEnv, ppo: PPO, seed: int, deterministic: bool = Fal
         dones.append(done)
         actions_log.append(a.tolist())
         total += r
+        r_reach += float(info.get("r_reach") or 0.0)
+        r_close += float(info.get("r_close") or 0.0)
+        r_lift += float(info.get("r_lift") or 0.0)
         success = info["success"] or success
         lifted = info["lifted_z"]
         spec = info["spec"]
@@ -65,6 +71,9 @@ def rollout_episode(env: PickEnv, ppo: PPO, seed: int, deterministic: bool = Fal
         "done": np.array(dones, dtype=np.float32),
         "actions": actions_log,
         "reward": total,
+        "r_reach": r_reach,
+        "r_close": r_close,
+        "r_lift": r_lift,
         "success": bool(success),
         "lifted_z": lifted,
         "spec": spec,
@@ -132,6 +141,9 @@ def main() -> None:
             "episodes_target": args.episodes,
             "success_rate": 0.0,
             "reward": 0.0,
+            "r_reach": 0.0,
+            "r_close": 0.0,
+            "r_lift": 0.0,
             "log": f"start on {dev}",
         },
     )
@@ -150,6 +162,9 @@ def main() -> None:
                     "seed": seed,
                     "actions": out["actions"],
                     "reward": out["reward"],
+                    "r_reach": out["r_reach"],
+                    "r_close": out["r_close"],
+                    "r_lift": out["r_lift"],
                     "success": out["success"],
                     "lifted_z": out["lifted_z"],
                     "object": out["spec"],
@@ -158,10 +173,10 @@ def main() -> None:
             )
             append_jsonl(
                 run_dir / "metrics.jsonl",
-                {"episode": ep, "reward": out["reward"], "success": out["success"], "rate": rate},
+                {"episode": ep, "reward": out["reward"], "r_reach": out["r_reach"], "r_close": out["r_close"], "r_lift": out["r_lift"], "success": out["success"], "rate": rate},
             )
             print(
-                f"ep {ep:4d}  R {out['reward']:7.2f}  success {int(out['success'])}  rate {rate:.2f}",
+                f"ep {ep:4d}  R {out['reward']:7.2f}  reach {out['r_reach']:5.2f}  close {out['r_close']:5.2f}  lift {out['r_lift']:5.2f}  success {int(out['success'])}  rate {rate:.2f}",
                 flush=True,
             )
             write_json(
@@ -173,7 +188,10 @@ def main() -> None:
                     "episodes_target": args.episodes,
                     "success_rate": rate,
                     "reward": out["reward"],
-                    "log": f"episode {ep} reward {out['reward']:.2f}",
+                    "r_reach": out["r_reach"],
+                    "r_close": out["r_close"],
+                    "r_lift": out["r_lift"],
+                    "log": f"episode {ep} reward {out['reward']:.2f} reach {out['r_reach']:.2f} close {out['r_close']:.2f} lift {out['r_lift']:.2f}",
                 },
             )
             ep += 1
@@ -198,6 +216,9 @@ def main() -> None:
                 "episodes_target": args.episodes,
                 "success_rate": float(np.mean(recent)) if recent else 0.0,
                 "reward": 0.0,
+                "r_reach": 0.0,
+                "r_close": 0.0,
+                "r_lift": 0.0,
                 "log": "finished",
             },
         )

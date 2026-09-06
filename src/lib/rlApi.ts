@@ -7,6 +7,9 @@ export type TrainStatus = {
   episodes_target: number;
   success_rate: number;
   reward: number;
+  r_reach?: number;
+  r_close?: number;
+  r_lift?: number;
   log: string;
   alive?: boolean;
   log_tail?: string[];
@@ -48,6 +51,9 @@ export type EpisodeRow = {
   index: number;
   success: boolean;
   reward: number;
+  r_reach?: number;
+  r_close?: number;
+  r_lift?: number;
   lifted_z: number;
   has_video: boolean;
 };
@@ -114,7 +120,9 @@ export const rl = {
   openRun: (runId: string) =>
     req(`/runs/${encodeURIComponent(runId)}/open`, { method: "POST" }),
   episodes: (runId: string): Promise<EpisodeRow[]> => req(`/runs/${runId}/episodes`),
-  metrics: (runId: string): Promise<{ episode: number; rate: number; reward: number }[]> =>
+  metrics: (
+    runId: string,
+  ): Promise<{ episode: number; rate: number; reward: number; r_reach?: number; r_close?: number; r_lift?: number }[]> =>
     req(`/runs/${runId}/metrics`),
   render: (runId: string, episode: number) =>
     req("/runs/render", {

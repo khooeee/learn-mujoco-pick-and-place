@@ -38,7 +38,7 @@ cd ml
 - Actor: small CNN on overhead + wrist views + joints
 - Critic: those **plus** object pose (training only)
 - Actions: 6 SO-101 actuators, no inverse kinematics
-- Reward: reach object and lift it
+- Reward: reach (open) → close → lift
 - Objects: Mint prompt or GLB import → local library. Longest edge is 4.5 cm on import.
 
 Not SmolVLA / ACT. Not the old browser IK toy arm.
@@ -91,21 +91,25 @@ Those 6 values are mapped linearly onto each actuator’s `ctrlrange`. No IK: th
 - Loss: `policy + 0.5 × value − 0.01 × entropy`
 - Update every **8** finished episodes (`--batch-episodes`)
 
-**Reward** (after each policy step; distances use the object AABB **center**, not the mesh origin)
+**Reward** (three gated phases; distances use the object AABB **center**, not the mesh origin)
 
 ```
-r = 2.0 × Δ(3D gripper–object distance), faded out once the center is in the jaws
-  + 0.8 × Δ(around)  (center near TCP and between the jaws — once, not linger)
-  + 1.0 × Δ(around × squeeze)
-      + small close-delta while in the jaws, − small close-delta in free space
-  + 0.8 × Δ(jaw-contact quality)  (0.5 per jaw; pinch = 1.0)
-  + 12 × Δz  only while dual-jaw contact EMA is on  (raise, not linger)
-  + hold progress (up to 0.4) while grasped + lift + near + low object speed
-  + 8.0 once that hold has lasted 16 policy steps
-  − 2.0 × how far the center is past the table edge  (on-table slides are free)
-  − 1.0 if the object falls through the table
+1. Reach (gripper must be open wider than the brick + 5 mm)
+   2.0 × Δ(3D gripper–object distance) + 0.8 × Δ(around)
+   − small penalty for closing in free space
+   Stage 1 latches when the center is between the open jaws (around ≥ 0.5)
+
+2. Close (only after stage 1; off again if the brick leaves the jaws)
+   1.0 × Δ(around × squeeze) + 0.8 × Δ(jaw contact) + close-delta in the jaws
+
+3. Lift (only while pinch EMA is on and dist < 12 cm)
+   12 × Δz
+   + hold progress (up to 0.4) while 8 cm up, near, slow
+   + 8.0 after 16 policy steps of that hold
+
+Always: −2.0 × past table edge, −1.0 if the object falls through the table
 ```
 
-Lift is how far the center rose from the pose at reset. Reach is 3D, so descending into the jaws is paid; there is no per-step hover-above bonus (that plateaued at R ≈ 1.1 with the brick still on the table). Grasp width is the object's AABB projected onto the jaw-opening axis. Squeeze, contact, around, and lift are all potentials: sitting still scores ~0 after you arrive. An 8 cm pinched lift plus success is about +9. Lift credit requires a dual-jaw pinch (EMA 0.7, threshold 0.35). Tilt is not penalized.
+Only one phase pays at a time. Sitting still scores ~0 after you arrive. Grasp width is the AABB along the jaw axis. Pinch EMA is 0.7 / threshold 0.35. Tilt is not penalized.
 
-Success = grasped (pinch EMA), center more than 8 cm above rest, within 12 cm of the gripper, object slower than 0.15 m/s and 2 rad/s, **held for 16 policy steps**. Changing this reward means **Train New**, not Resume.
+Success = phase 3 hold for **16 policy steps**. Changing this reward means **Train New**, not Resume.

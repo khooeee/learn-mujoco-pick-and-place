@@ -43,6 +43,9 @@ GRASP_K = 1.0
 CONTACT_K = 0.8
 REACH_K = 2.0
 AROUND_K = 0.8
+OPEN_EXTRA = 0.005
+STAGE1_ON = 0.5
+STAGE1_OFF = 0.2
 FIXED_JAW_MESH = "wrist_roll_follower_so101_v1"
 MOVING_JAW_MESH = "moving_jaw_so101_v1"
 
@@ -88,6 +91,7 @@ class PickEnv:
         self._grasp_prev = 0.0
         self._contact_prev = 0.0
         self._pinch_ema = 0.0
+        self._stage1 = False
         self._hold = 0
         self._fixed_jaw_geoms: np.ndarray = np.zeros(0, dtype=np.int32)
         self._moving_jaw_geoms: np.ndarray = np.zeros(0, dtype=np.int32)
@@ -210,6 +214,7 @@ class PickEnv:
         self._grasp_prev = 0.0
         self._contact_prev = 0.0
         self._pinch_ema = 0.0
+        self._stage1 = False
         self._hold = 0
         return self.observe()
 
@@ -339,7 +344,7 @@ class PickEnv:
         dy = abs(float(obj[1]) - TABLE_CY) - TABLE_HY
         return max(0.0, dx, dy)
 
-    def _reward(self) -> tuple[float, bool]:
+    def _reward(self) -> tuple[float, bool, dict]:
         obj = self._obj_center()
         grip = self.data.site_xpos[self.grip_site]
         dist = float(np.linalg.norm(obj - grip))
@@ -348,46 +353,65 @@ class PickEnv:
         open_m = open_now * GRIPPER_MAX_OPEN
         around = self._around(obj, dist)
         grasp_w = self._jaw_axis_width()
+        opened = float(open_m >= grasp_w + OPEN_EXTRA)
         close_delta = max(0.0, self._open_prev - open_now)
         squeeze = self._squeeze(open_m, grasp_w)
         grasp_q = around * squeeze
-        r_grasp = GRASP_K * (grasp_q - self._grasp_prev)
-        r_grasp += around * 0.4 * close_delta
-        r_grasp -= (1.0 - around) * close_delta * 0.3
         touch_fixed, touch_moving = self._jaw_contacts()
         pinch = touch_fixed * touch_moving
         self._pinch_ema = PINCH_EMA * self._pinch_ema + (1.0 - PINCH_EMA) * pinch
-        grasped = float(self._pinch_ema >= PINCH_ON)
+        grasped = self._pinch_ema >= PINCH_ON
         contact_q = 0.5 * touch_fixed + 0.5 * touch_moving
-        r_contact = CONTACT_K * (contact_q - self._contact_prev)
-        r_lift = LIFT_K * (lift - self._lift_prev) * grasped
-        approach = 1.0 - around
-        r_reach = REACH_K * (self._dist_prev - dist) * approach
-        r_around = AROUND_K * (around - self._around_prev)
-        r_off = -2.0 * self._off_table(obj)
+        at_open = around >= STAGE1_ON and opened > 0.0
+        phase_lift = grasped and dist < 0.12
+        phase_close = (self._stage1 or at_open) and not phase_lift
+        phase_reach = not phase_close and not phase_lift
+
+        r_reach = 0.0
+        r_close = 0.0
+        r_lift = 0.0
+        if phase_reach:
+            r_reach = opened * (
+                REACH_K * (self._dist_prev - dist) + AROUND_K * (around - self._around_prev)
+            )
+            r_reach -= (1.0 - opened) * close_delta * 0.3
+        elif phase_close:
+            r_close = GRASP_K * (grasp_q - self._grasp_prev)
+            r_close += CONTACT_K * (contact_q - self._contact_prev)
+            r_close += around * 0.4 * close_delta
+        else:
+            r_lift = LIFT_K * (lift - self._lift_prev)
+
         lin, ang = self._obj_speeds()
         holding = (
-            grasped > 0.0
+            phase_lift
             and lift > 0.08
-            and dist < 0.12
             and lin < OBJ_LIN_MAX
             and ang < OBJ_ANG_MAX
         )
         self._hold = self._hold + 1 if holding else 0
-        r_hold = 0.4 * (self._hold / HOLD_STEPS) if holding else 0.0
-        r = r_reach + r_around + r_lift + float(r_grasp) + r_contact + r_off + r_hold
         success = self._hold >= HOLD_STEPS
-        if success:
-            r += 8.0
+        r_hold = 0.4 * (self._hold / HOLD_STEPS) if holding else 0.0
+        r_off = -2.0 * self._off_table(obj)
         if self._obj_bottom_z() < 0.01:
-            r -= 1.0
+            r_off -= 1.0
+        r_lift += r_hold + (8.0 if success else 0.0)
+        r = r_reach + r_close + r_lift + r_off
+        if at_open:
+            self._stage1 = True
+        elif around < STAGE1_OFF:
+            self._stage1 = False
         self._open_prev = open_now
         self._dist_prev = dist
         self._around_prev = around
         self._lift_prev = lift
         self._grasp_prev = grasp_q
         self._contact_prev = contact_q
-        return r, success
+        return r, success, {
+            "r_reach": float(r_reach),
+            "r_close": float(r_close),
+            "r_lift": float(r_lift),
+        }
 
     def step(self, action: np.ndarray) -> tuple[dict, float, bool, dict]:
         ctrl = self._scale_action(np.asarray(action, dtype=np.float64))
@@ -396,7 +420,7 @@ class PickEnv:
         for _ in range(self.action_repeat):
             self.data.ctrl[self.act_ids] = ctrl
             mujoco.mj_step(self.model, self.data)
-        r, success = self._reward()
+        r, success, parts = self._reward()
         reward += r
         self._t += 1
         center = self._obj_center()
@@ -404,6 +428,9 @@ class PickEnv:
         info = {
             "success": bool(success),
             "lifted_z": float(center[2]),
+            "r_reach": parts["r_reach"],
+            "r_close": parts["r_close"],
+            "r_lift": parts["r_lift"],
             "spec": {
                 "x": self.spec.x,
                 "y": self.spec.y,

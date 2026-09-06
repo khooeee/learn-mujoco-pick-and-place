@@ -21,6 +21,54 @@ function RateChart({ points }: { points: { episode: number; rate: number }[] }) 
   );
 }
 
+type PhasePt = {
+  episode: number;
+  r_reach?: number;
+  r_close?: number;
+  r_lift?: number;
+};
+
+function RewardChart({ points }: { points: PhasePt[] }) {
+  const series = [
+    { key: "r_reach" as const, stroke: "#e85d04", label: "reach" },
+    { key: "r_close" as const, stroke: "#f4c95d", label: "close" },
+    { key: "r_lift" as const, stroke: "#6ab04c", label: "lift" },
+  ];
+  if (points.length < 2) return <p className="hint">Phase rewards appear after a few episodes.</p>;
+  const w = 320;
+  const h = 72;
+  const maxX = Math.max(...points.map((p) => p.episode), 1);
+  const vals = points.flatMap((p) => series.map((s) => p[s.key] ?? 0));
+  const yMin = Math.min(0, ...vals);
+  const yMax = Math.max(0.01, ...vals);
+  const span = yMax - yMin || 1;
+  const path = (key: "r_reach" | "r_close" | "r_lift") =>
+    points
+      .map((p, i) => {
+        const x = (p.episode / maxX) * w;
+        const y = h - ((p[key] ?? 0) - yMin) / span * (h - 6) - 3;
+        return `${i === 0 ? "M" : "L"}${x.toFixed(1)},${y.toFixed(1)}`;
+      })
+      .join(" ");
+  return (
+    <div>
+      <svg className="chart" viewBox={`0 0 ${w} ${h}`} width="100%" height="72">
+        {series.map((s) => (
+          <path key={s.key} d={path(s.key)} fill="none" stroke={s.stroke} strokeWidth="2" />
+        ))}
+      </svg>
+      <p className="chart-legend">
+        {series.map((s) => (
+          <span key={s.key}>
+            <i style={{ background: s.stroke }} />
+            {s.label}
+          </span>
+        ))}
+      </p>
+    </div>
+  );
+}
+
 export function Panel() {
   const rlOnline = useTwin((s) => s.rlOnline);
   const status = useTwin((s) => s.status);
@@ -419,9 +467,13 @@ export function Panel() {
           <p className="metric">
             {status.run_id ?? "—"} · {status.state} · ep {status.episode}/{status.episodes_target} ·
             success {(status.success_rate * 100).toFixed(0)}% · R {status.reward.toFixed(2)}
+            {" · "}
+            reach {(status.r_reach ?? 0).toFixed(2)} · close {(status.r_close ?? 0).toFixed(2)} · lift{" "}
+            {(status.r_lift ?? 0).toFixed(2)}
           </p>
         )}
         <RateChart points={metrics} />
+        <RewardChart points={metrics} />
         <pre className="logtail">{(status?.log_tail ?? []).slice(-12).join("\n") || " "}</pre>
       </section>
 
@@ -450,7 +502,8 @@ export function Panel() {
           {epRows.map((e) => (
               <div className="ep" key={e.index}>
                 <span>
-                  #{e.index} {e.success ? "lift" : "miss"} R {e.reward.toFixed(1)}
+                  #{e.index} {e.success ? "lift" : "miss"} R {e.reward.toFixed(1)} · r{" "}
+                  {(e.r_reach ?? 0).toFixed(1)} c {(e.r_close ?? 0).toFixed(1)} l {(e.r_lift ?? 0).toFixed(1)}
                 </span>
                 <div className="ep-actions">
                   <button

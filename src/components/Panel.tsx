@@ -41,6 +41,7 @@ export function Panel() {
   const runRows = [...runs].sort((a, b) => b.id.localeCompare(a.id));
   const selectedRun = runRows.find((r) => r.id === runId);
   const [epWindow, setEpWindow] = useState<{ runId: string; from: number } | null>(null);
+  const [epFilter, setEpFilter] = useState<"latest" | "all" | "viewable">("latest");
   const epFrom =
     epWindow && epWindow.runId === runId
       ? epWindow.from
@@ -49,7 +50,11 @@ export function Panel() {
         : 0;
   const epRows = [...episodes]
     .sort((a, b) => a.index - b.index)
-    .filter((e) => e.index >= epFrom);
+    .filter((e) => {
+      if (epFilter === "viewable") return e.has_video;
+      if (epFilter === "latest") return e.index >= epFrom;
+      return true;
+    });
   const glbInput = useRef<HTMLInputElement>(null);
   const [importBusy, setImportBusy] = useState(false);
 
@@ -114,6 +119,7 @@ export function Panel() {
   }, []);
 
   useEffect(() => {
+    if (epFilter !== "latest") return;
     if (!runId || episodes.length === 0) {
       setEpWindow(null);
       return;
@@ -123,7 +129,7 @@ export function Panel() {
       const maxIdx = Math.max(...episodes.map((e) => e.index));
       return { runId, from: Math.max(0, maxIdx - 49) };
     });
-  }, [runId, episodes]);
+  }, [runId, episodes, epFilter]);
 
   const running = status?.state === "running" || status?.alive;
 
@@ -407,9 +413,21 @@ export function Panel() {
 
       <section>
         <h2>4. Episodes</h2>
-        <p className="hint">
-          Latest 50 on load. New episodes append below so rows you are clicking stay put.
-        </p>
+        <label className="field">
+          <span>Show</span>
+          <select
+            value={epFilter}
+            onChange={(e) => {
+              const next = e.target.value as "latest" | "all" | "viewable";
+              setEpFilter(next);
+              if (next === "latest") setEpWindow(null);
+            }}
+          >
+            <option value="latest">Latest 50</option>
+            <option value="all">All</option>
+            <option value="viewable">Viewable</option>
+          </select>
+        </label>
         {videoUrl && (
           <button onClick={() => useTwin.getState().setVideoUrl(null)}>Stop video</button>
         )}

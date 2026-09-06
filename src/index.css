@@ -151,7 +151,8 @@ body,
 
 .field input[type="number"],
 .field input[type="file"],
-.field textarea {
+.field textarea,
+.field select {
   background: #120f0c;
   color: #f3ece4;
   border: 1px solid #3a3128;

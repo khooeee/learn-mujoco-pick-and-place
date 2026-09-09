@@ -11,6 +11,5 @@ ml/.venv/
 ml/so101/assets/runtime_object.stl
 ml/so101/assets/runtime_object.obj
 ml/so101/assets/runtime_object.png
-ml/assets/objects/*
 !ml/assets/objects/.gitkeep
 notes.md

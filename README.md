@@ -1,4 +1,10 @@
-# TwinPick — SO-101 vision RL
+# learn-mujoco-pick-and-place
+
+My learning attempt at training pick & place with a SO-101 arm in a simulation
+
+I learnt enough to know why classical RL has limits lol.
+
+---
 
 **Pick is trained in MuJoCo** on the official SO-101 arm: cameras in, joint targets out, lift reward. Replay any episode as mp4.
 
